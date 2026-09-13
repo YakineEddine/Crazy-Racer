@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="KartStats" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/kart_stats.gd" id="1"]
+
+[sub_resource type="Curve" id="Curve_suv"]
+_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.6, 0.35), 0.0, 0.0, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[resource]
+script = ExtResource("1")
+display_name = "SUV Baroudeur"
+top_speed = 20.0
+acceleration = 10.0
+turning_radius = 0.45
+mass = 1700.0
+drift_boost_curve = SubResource("Curve_suv")
+collision_shape_scale = Vector3(1.5, 1.3, 2.3)
+is_plow_class = false
+knockback_multiplier = 0.6
+ignores_size_hazards = false
+body_color = Color(0.15, 0.35, 0.2, 1)
+boost_power = 11.5

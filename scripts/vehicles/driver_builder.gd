@@ -1,7 +1,14 @@
 class_name DriverBuilder
 extends RefCounted
-## Pilotes low-poly charmants (casque, visiere, bras) + variantes croco/pingouin/poulet.
+## Pilotes : Quaternius CC0 (vache, cochon...) ou low-poly procedural (casque, visiere).
 ## build() vide le conteneur puis reconstruit (sert aussi au transform Rocket->pingouin).
+
+## Animaux Quaternius : [fichier FBX, echelle] — visage vers -Z (rotation PI).
+const FARM := {
+	"cow": ["Cow", 0.20], "pig": ["Pig", 0.22], "sheep": ["Sheep", 0.23],
+	"horse": ["Horse", 0.16], "llama": ["Llama", 0.18], "pug": ["Pug", 0.38],
+	"zebra": ["Zebra", 0.155],
+}
 
 static func mat(c: Color, rough: float = 0.6, emission: float = 0.0) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
@@ -48,9 +55,31 @@ static func capsule(parent: Node3D, r: float, h: float, pos: Vector3, c: Color, 
 	parent.add_child(mi)
 	return mi
 
+static func farm_model(cid: String) -> Node3D:
+	var e: Array = FARM.get(cid, [])
+	if e.is_empty():
+		return null
+	var m := ModelFactory.instance("res://assets/models/farm/%s.fbx" % str(e[0]))
+	if m == null:
+		return null
+	ModelFactory.scale_to(m, float(e[1]))
+	m.rotation.y = PI
+	ModelFactory.play_anim(m, ["Idle"])
+	return m
+
 static func build(root: Node3D, cid: String) -> void:
 	for c in root.get_children():
 		c.free()
+	if FARM.has(cid):
+		var m := farm_model(cid)
+		if m:
+			m.position = Vector3(0, -0.15, 0.1)
+			root.add_child(m)
+			return
+		# Fallback procedural si le FBX manque.
+		capsule(root, 0.26, 0.7, Vector3(0, 0.35, 0.1), Color(0.8, 0.7, 0.6))
+		ball(root, 0.24, Vector3(0, 0.95, 0.05), Color(0.8, 0.7, 0.6))
+		return
 	var body := Color(1, 0.8, 0.6)
 	var accent := Color(0.2, 0.5, 1.0)
 	match cid:

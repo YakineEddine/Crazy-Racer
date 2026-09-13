@@ -71,13 +71,13 @@ func _ready() -> void:
 	_body_mat = StandardMaterial3D.new()
 	_body_mat.albedo_color = stats.body_color
 	_body_mat.roughness = 0.5
-	VehicleMeshBuilder.build(self)
-	_apply_body_color()
 	_driver = Node3D.new()
 	_driver.name = "Driver"
 	_driver.position = Vector3(0, 0.21, 0.35)
 	(get_node("Body") as Node3D).add_child(_driver)
 	DriverBuilder.build(_driver, character_id)
+	VehicleMeshBuilder.build(self)
+	_apply_body_color()
 	_build_shield()
 	_skid_mat = StandardMaterial3D.new()
 	_skid_mat.albedo_color = Color(0.05, 0.05, 0.06, 0.55)
@@ -313,6 +313,8 @@ func _tick_timers(delta: float) -> void:
 		shrink_timer -= delta
 		if shrink_timer <= 0.0:
 			scale = _orig_scale
+			# Fin du rayon : on rend le vrai pilote (pingouin si transform actif).
+			_refresh_driver_model()
 	if chicken_timer > 0.0: chicken_timer -= delta
 	if penguin_timer > 0.0:
 		penguin_timer -= delta
@@ -484,6 +486,8 @@ func apply_shrink(dur: float) -> void:
 		return
 	shrink_timer = dur
 	scale = _orig_scale * 0.55
+	# Rayon reducteur : le pilote devient un mini-cochon.
+	DriverBuilder.build(_driver, "pig")
 	_lose_coins()
 	_hit_wobble()
 	Audio.play("hit")

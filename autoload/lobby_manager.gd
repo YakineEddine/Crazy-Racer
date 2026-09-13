@@ -97,8 +97,8 @@ func ensure_bot_fill() -> void:
 	elif fmt == "ffa":
 		target = 6
 	var bot_names := ["Bot Croco", "Bot Pingouin", "Bot Poulet", "Bot Turbo", "Bot Banane", "Bot Fusee"]
-	var bot_classes := ["kart", "car", "truck", "motorcycle", "bicycle"]
-	var bot_chars := ["crocodile", "penguin", "chicken", "human"]
+	var bot_classes := ["kart", "car", "truck", "motorcycle", "bicycle", "sport", "taxi", "suv"]
+	var bot_chars := ["crocodile", "penguin", "chicken", "human", "cow", "pig", "sheep", "horse"]
 	var i := 0
 	while players.size() < target:
 		var bid := -(100 + i) ## ids negatifs = bots locaux

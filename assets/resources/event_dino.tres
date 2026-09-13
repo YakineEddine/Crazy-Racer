@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="ChaosEventData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/chaos_event_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "dino_stampede"
+display_name = "Stampede de Dinos !"
+description = "Des dinosaures traversent la piste (~12s). Evitez-les !"
+duration = 12.0
+banner_color = Color(0.3, 0.8, 0.2, 1)
+base_weight = 0.6

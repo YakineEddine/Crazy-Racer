@@ -10,17 +10,20 @@ var _veh_lbl: Label = null
 var _char_lbl: Label = null
 var _stat_bars: Dictionary = {}
 
-const VEHICLES := ["kart", "car", "truck", "motorcycle", "bicycle"]
-const VEH_NAMES := {"kart": "Kart", "car": "Car", "truck": "Camion", "motorcycle": "Moto", "bicycle": "Velo"}
+const VEHICLES := ["kart", "car", "truck", "motorcycle", "bicycle", "sport", "taxi", "suv"]
+const VEH_NAMES := {"kart": "Kart", "car": "Car", "truck": "Camion", "motorcycle": "Moto", "bicycle": "Velo", "sport": "Sport GT", "taxi": "Taxi", "suv": "SUV"}
 const VEH_STATS := {
 	"kart": "res://assets/resources/kart_stats.tres",
 	"car": "res://assets/resources/car_stats.tres",
 	"truck": "res://assets/resources/truck_stats.tres",
 	"motorcycle": "res://assets/resources/motorcycle_stats.tres",
 	"bicycle": "res://assets/resources/bicycle_stats.tres",
+	"sport": "res://assets/resources/sport_stats.tres",
+	"taxi": "res://assets/resources/taxi_stats.tres",
+	"suv": "res://assets/resources/suv_stats.tres",
 }
-const CHARS := ["human", "crocodile", "penguin", "chicken"]
-const CHAR_NAMES := {"human": "Humain", "crocodile": "Croco", "penguin": "Pingouin", "chicken": "Poulet"}
+const CHARS := ["human", "crocodile", "penguin", "chicken", "cow", "pig", "sheep", "horse", "llama", "pug", "zebra"]
+const CHAR_NAMES := {"human": "Humain", "crocodile": "Croco", "penguin": "Pingouin", "chicken": "Poulet", "cow": "Vache", "pig": "Cochon", "sheep": "Mouton", "horse": "Cheval", "llama": "Lama", "pug": "Carlin", "zebra": "Zebre"}
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)

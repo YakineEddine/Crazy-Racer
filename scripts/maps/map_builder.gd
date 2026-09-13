@@ -534,6 +534,7 @@ func _build_dressing() -> void:
 			_dress_farm()
 
 var _windmill: Node3D = null
+var _dino_active: bool = false
 
 func _tower(pos: Vector3, w: float, h: float, d: float, col: Color, emission: float = 0.0) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
@@ -570,6 +571,11 @@ func _dress_neon() -> void:
 	_tower(Vector3(-8, 4, 40), 1.0, 8.0, 1.0, Color(1, 0.18, 0.53), 2.0)
 	_tower(Vector3(8, 4, 40), 1.0, 8.0, 1.0, Color(0.15, 0.9, 1.0), 2.0)
 	_tower(Vector3(0, 8.2, 40), 17.0, 1.0, 1.0, Color(1, 0.88, 0.2), 2.0)
+	# Parking central : vraies voitures (Quaternius CC0).
+	_place_model("res://assets/models/cars/Cop.fbx", Vector3(15, 0, 14), 1.0, 1.5708, [])
+	_place_model("res://assets/models/cars/NormalCar1.fbx", Vector3(22, 0, 14), 1.0, 1.5708, [])
+	_place_model("res://assets/models/cars/NormalCar2.fbx", Vector3(29, 0, 14), 1.0, 1.5708, [])
+	_place_model("res://assets/models/cars/SportsCar.fbx", Vector3(22, 0, 21), 1.0, -1.5708, [])
 
 func _tree(pos: Vector3, trunk_h: float, leaf_c: Color, leaf_r: float) -> void:
 	var trunk := MeshInstance3D.new()
@@ -626,6 +632,10 @@ func _dress_swamp() -> void:
 		_tower(Vector3(x, 0.8, 12), 4.0, 0.4, 4.0, Color(0.35, 0.25, 0.15))
 		_tower(Vector3(x, 2.6, 12), 3.4, 3.0, 3.0, Color(0.45, 0.32, 0.18))
 		_tower(Vector3(x, 4.6, 12), 4.2, 1.2, 4.2, Color(0.25, 0.4, 0.15))
+	# Geants du marais (vrais modeles animes).
+	_place_model("res://assets/models/dino/Trex.fbx", Vector3(30, 0, -12), 0.28, 2.2, ["Idle"])
+	_place_model("res://assets/models/dino/Apatosaurus.fbx", Vector3(-24, 0, 16), 0.30, -0.7, ["Idle", "Walk"])
+	_place_model("res://assets/models/dino/Parasaurolophus.fbx", Vector3(5, 0, -18), 0.35, 0.4, ["Idle"])
 
 func _dress_ice() -> void:
 	# Pics de glace translucides + igloos + aurore boreale.
@@ -725,11 +735,83 @@ func _dress_farm() -> void:
 			crop.set_surface_override_material(0, _mat(Color(0.85, 0.7, 0.3), 0.9))
 			crop.position = Vector3(float(ix), 0.4, float(iz))
 			add_child(crop)
+	# Betail au pre (vrais modeles animes).
+	_place_model("res://assets/models/farm/Cow.fbx", Vector3(10, 0, 14), 0.30, 0.6, ["Idle", "Eat"])
+	_place_model("res://assets/models/farm/Cow.fbx", Vector3(-18, 0, -15), 0.28, 2.8, ["Idle"])
+	_place_model("res://assets/models/farm/Sheep.fbx", Vector3(5, 0, -16), 0.32, 1.2, ["Idle"])
+	_place_model("res://assets/models/farm/Sheep.fbx", Vector3(-8, 0, 18), 0.30, -0.9, ["Idle"])
+	_place_model("res://assets/models/farm/Pig.fbx", Vector3(32, 0, 12), 0.30, 2.0, ["Idle"])
 
 func _process(_delta: float) -> void:
 	# Moulin + pulsation des pads (le reste est statique).
 	if is_instance_valid(_windmill):
 		_windmill.rotation.z += _delta * 0.8
+
+# --- Stampede de dinos (event chaos) : traversent les lignes droites ---
+
+func start_dino_stampede(duration: float) -> void:
+	_dino_active = true
+	_dino_loop(duration)
+
+func stop_dino_stampede() -> void:
+	_dino_active = false
+
+func _dino_loop(duration: float) -> void:
+	await get_tree().create_timer(0.5).timeout
+	var t := 0.0
+	while _dino_active and t < duration:
+		_spawn_runner()
+		t += 3.0
+		await get_tree().create_timer(3.0).timeout
+
+func _spawn_runner() -> void:
+	var kinds := [["Triceratops", 0.35], ["Velociraptor", 0.42], ["Stegosaurus", 0.30]]
+	var pick: Array = kinds[_rng.randi() % kinds.size()]
+	var m := ModelFactory.instance("res://assets/models/dino/%s.fbx" % str(pick[0]))
+	if m == null:
+		return
+	ModelFactory.scale_to(m, float(pick[1]))
+	var lane: float = [-40.0, 40.0][_rng.randi() % 2]
+	var dir := 1.0 if _rng.randf() < 0.5 else -1.0
+	add_child(m)
+	m.position = Vector3(-85.0 * dir, 0, lane)
+	m.rotation.y = atan2(dir, 0.0)
+	ModelFactory.play_anim(m, ["Run", "Walk"])
+	VfxFactory.burst(m, "collapse")
+	var hit := Area3D.new()
+	hit.collision_layer = 0
+	hit.collision_mask = 1
+	var cs := CollisionShape3D.new()
+	var ss := SphereShape3D.new()
+	ss.radius = 2.4
+	cs.shape = ss
+	cs.position = Vector3(0, 1.6, 0)
+	hit.add_child(cs)
+	m.add_child(hit)
+	hit.body_entered.connect(func(b: Node3D) -> void:
+		if b.is_in_group("vehicles") and b.has_method("apply_shell_hit"):
+			b.call("apply_shell_hit", m.global_position)
+			Audio.play("hit")
+			hit.set_deferred("monitoring", false)
+			await get_tree().create_timer(1.0).timeout
+			if is_instance_valid(hit):
+				hit.set_deferred("monitoring", true)
+	)
+	var tw := create_tween()
+	tw.tween_property(m, "position:x", 85.0 * dir, 9.0)
+	tw.tween_callback(m.queue_free)
+
+# --- Decor vivant (modeles reels) ---
+
+func _place_model(path: String, pos: Vector3, scl: float, rot_y: float, anims: Array) -> void:
+	var m := ModelFactory.instance(path)
+	if m == null:
+		return
+	add_child(m)
+	m.position = pos
+	m.rotation.y = rot_y
+	ModelFactory.scale_to(m, scl)
+	ModelFactory.play_anim(m, anims)
 
 # --- Meteores (03 §3.2 + 06 §3 : telegraph + impact) ---
 

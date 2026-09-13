@@ -21,6 +21,7 @@ const EVENT_PATHS := [
 	"res://assets/resources/event_gravity.tres",
 	"res://assets/resources/event_collapse.tres",
 	"res://assets/resources/event_meteor.tres",
+	"res://assets/resources/event_dino.tres",
 ]
 
 func _ready() -> void:
@@ -133,6 +134,11 @@ func _apply_effect(event: ChaosEventData, on: bool) -> void:
 			get_tree().call_group("maps", "set_gravity_visual", on)
 		"track_collapse":
 			get_tree().call_group("maps", "set_shortcut_collapsed", on)
+		"dino_stampede":
+			if on:
+				get_tree().call_group("maps", "start_dino_stampede", event.duration)
+			else:
+				get_tree().call_group("maps", "stop_dino_stampede")
 		"meteor_shower":
 			if on:
 				get_tree().call_group("maps", "start_meteor_shower", event.duration)

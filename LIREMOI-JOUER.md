@@ -60,7 +60,18 @@ whoosh de boost, bips 3-2-1-GO, impacts — tout est synthetise en WAV au demarr
   confettis sur les podiums, minimap par equipe.
 - **Musique chiptune** generee (C-G-Am-F) + touche **M** ou bouton ♪ pour couper, bruit de derapage.
 
-## 8. Fichiers cles
+## 8. Vrais modeles 3D (packs Quaternius CC0, `assets/models/`)
+
+- **Voitures jouables** : Sport GT (SportsCar2), Taxi Jaune, SUV Baroudeur — carrosserie reelle
+  auto-ajustee, roues statiques masquees (nos roues tournent/braquent), pilote cale dans l'habitacle.
+- **11 pilotes** : humain/croco/pingouin/poulet (procedural) + vache, cochon, mouton, cheval, lama,
+  carlin, zebre (modeles animes, Idle) — selection au lobby.
+- **Powerup/crush** : le Rayon Reducteur transforme le pilote en **mini-cochon** ;
+  event chaos **Stampede de Dinos** (Trike/Raptor/Stego traversent la piste, renversent les karts).
+- **Decor vivant** : parking (Cop + berlines) sur Neon, T-Rex + Apatosaure + Parasaurolophus sur Swamp,
+  vaches/moutons/cochon au pre sur Farm.
+
+## 9. Fichiers cles
 
 `scenes/main.tscn` • `autoload/*` (6 + `Audio`) • `scripts/vehicles/vehicle_controller.gd` •
 `scripts/items/item_system.gd|projectile.gd|coin.gd|item_box.gd` • `scripts/maps/map_builder.gd` •

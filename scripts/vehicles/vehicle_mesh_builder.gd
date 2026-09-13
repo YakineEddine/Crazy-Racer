@@ -60,7 +60,21 @@ static func _class_of(v: Node) -> String:
 		return "car"
 	return "kart"
 
+## Vrais modeles Quaternius CC0 : [fichier, longueur cible, hauteur pilote].
+const REAL_MODELS := {
+	"Sport GT": ["SportsCar2", 2.9, -0.9],
+	"Taxi Jaune": ["Taxi", 2.9, -0.9],
+	"SUV Baroudeur": ["SUV", 3.4, -0.7],
+}
+const REAL_LENGTHS := {"SportsCar2": 3.93, "Taxi": 4.22, "SUV": 4.21}
+
 static func build(v: Node) -> void:
+	var dn: String = str((v.get("stats") as KartStats).display_name)
+	if REAL_MODELS.has(dn):
+		_mount_real(v, dn)
+		_build_wheels(v, "car")
+		_build_nametag(v)
+		return
 	var body := v.get_node("Body") as MeshInstance3D
 	var stats: KartStats = v.get("stats")
 	var cls := _class_of(v)
@@ -177,6 +191,25 @@ static func _build_wheels(v: Node, cls: String) -> void:
 		rim.set_surface_override_material(0, _mat(Color(0.85, 0.85, 0.9), 0.3, 0.8))
 		rim.rotation.z = 1.5708
 		wm.add_child(rim)
+
+static func _mount_real(v: Node, dn: String) -> void:
+	# Carrosserie FBX auto-ajustee + roues statiques masquees (nos roues tournent).
+	var e: Array = REAL_MODELS[dn]
+	var m := ModelFactory.instance("res://assets/models/cars/%s.fbx" % str(e[0]))
+	var body := v.get_node("Body") as MeshInstance3D
+	if m == null or body == null:
+		return
+	body.mesh = null # la carrosserie FBX remplace le cube procedural
+	var s: float = float(e[1]) / float(REAL_LENGTHS.get(str(e[0]), 4.0))
+	ModelFactory.scale_to(m, s)
+	m.rotation.y = PI # Unity +Z -> Godot -Z
+	m.position = Vector3(0, -1.05, 0)
+	body.add_child(m)
+	ModelFactory.hide_wheels(m)
+	# Pilote cale dans l'habitacle (casque qui depasse, style decouvrable).
+	var drv := v.get_node_or_null("Driver") as Node3D
+	if drv:
+		drv.position = Vector3(0, float(e[2]), 0.25)
 
 static func _build_nametag(v: Node) -> void:
 	var tag := Label3D.new()

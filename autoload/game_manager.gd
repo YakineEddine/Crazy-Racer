@@ -351,6 +351,9 @@ func _spawn_vehicle(peer_id: int, vehicle_class: String, character_id: String, t
 		"truck": "res://scenes/vehicles/truck.tscn",
 		"motorcycle": "res://scenes/vehicles/motorcycle.tscn",
 		"bicycle": "res://scenes/vehicles/bicycle.tscn",
+		"sport": "res://scenes/vehicles/sport.tscn",
+		"taxi": "res://scenes/vehicles/taxi.tscn",
+		"suv": "res://scenes/vehicles/suv.tscn",
 	}
 	var path: String = paths.get(vehicle_class, paths["kart"])
 	var packed: PackedScene = load(path) as PackedScene
