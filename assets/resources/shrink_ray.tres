@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/item_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "shrink_ray"
+display_name = "Rayon Reducteur"
+description = "Transforme la cible en baignoire/escargot lent pendant 5s."
+pickup_rarity = 0.9
+effect_duration = 5.0
+cooldown = 1.0
+icon_color = Color(0.4, 0.6, 1, 1)
+is_self_target = false
+effect_script_path = "res://scripts/items/effects/shrink_effect.gd"

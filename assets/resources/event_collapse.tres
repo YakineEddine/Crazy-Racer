@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="ChaosEventData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/chaos_event_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "track_collapse"
+display_name = "Pont Effondre !"
+description = "Le raccourci autoroute/pont s'effondre, reroute force."
+duration = 20.0
+banner_color = Color(1, 0.4, 0.1, 1)
+base_weight = 1.0

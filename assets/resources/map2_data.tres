@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="MapData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/map_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+map_id = "map2_swamp"
+display_name = "Swamp Gator GP"
+checkpoint_count = 5
+shortcut_description = "Traversee sur rondins dans l'eau, tres etroit, sans protection."
+weighted_events = {"gravity_inversion": 0.5, "meteor_shower": 2.0, "track_collapse": 0.8}
+scene_path = "res://scenes/maps/map2_swamp_gator_gp.tscn"
+theme_color_ground = Color(0.05, 0.15, 0.08, 1)
+theme_color_track = Color(0.3, 0.22, 0.12, 1)
+theme_color_wall = Color(0.2, 0.6, 0.2, 1)
+laps_to_win = 3

@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="KartStats" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/kart_stats.gd" id="1"]
+
+[sub_resource type="Curve" id="Curve_bike"]
+_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.35, 0.6), 0.0, 0.0, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[resource]
+script = ExtResource("1")
+display_name = "Velo BMX"
+top_speed = 17.0
+acceleration = 10.0
+turning_radius = 0.95
+mass = 350.0
+drift_boost_curve = SubResource("Curve_bike")
+collision_shape_scale = Vector3(0.6, 0.9, 1.2)
+is_plow_class = false
+knockback_multiplier = 1.2
+ignores_size_hazards = true
+body_color = Color(1, 0.9, 0.2, 1)
+boost_power = 10.0

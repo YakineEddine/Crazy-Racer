@@ -1,0 +1,20 @@
+# Godot 4 — cache editeur, builds, OS
+.godot/
+*.tmp
+*.log
+
+# Exports
+builds/
+*.apk
+*.aab
+*.exe
+*.pck
+*.zip
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Sauvegardes locales du jeu (user://, pas dans le repo)
+# (rien a exclure ici : user:// est hors projet)

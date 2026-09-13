@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="ChaosEventData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/chaos_event_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "gravity_inversion"
+display_name = "Inversion Gravite !"
+description = "Gravite inversee 10s sur tous les vehicules."
+duration = 10.0
+banner_color = Color(0.6, 0.3, 1, 1)
+base_weight = 1.0

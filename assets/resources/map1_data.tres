@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="MapData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/map_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+map_id = "map1_neon"
+display_name = "Neon Circuit City"
+checkpoint_count = 4
+shortcut_description = "Boucle d'autoroute surelevee, etroite, garde-corps bas."
+weighted_events = {"gravity_inversion": 0.5, "meteor_shower": 0.8, "track_collapse": 2.0}
+scene_path = "res://scenes/maps/map1_neon_circuit_city.tscn"
+theme_color_ground = Color(0.05, 0.05, 0.12, 1)
+theme_color_track = Color(0.12, 0.12, 0.25, 1)
+theme_color_wall = Color(1, 0.18, 0.53, 1)
+laps_to_win = 3

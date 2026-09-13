@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/item_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "banana_boost"
+display_name = "Banana Super Boost"
+description = "Boost avant + trainee glissante derriere (6s)."
+pickup_rarity = 1.2
+effect_duration = 6.0
+cooldown = 1.0
+icon_color = Color(1, 0.9, 0.2, 1)
+is_self_target = true
+effect_script_path = "res://scripts/items/effects/banana_effect.gd"

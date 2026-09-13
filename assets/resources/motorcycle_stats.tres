@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="KartStats" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/kart_stats.gd" id="1"]
+
+[sub_resource type="Curve" id="Curve_moto"]
+_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.4, 0.55), 0.0, 0.0, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[resource]
+script = ExtResource("1")
+display_name = "Moto Sport"
+top_speed = 25.0
+acceleration = 19.0
+turning_radius = 0.85
+mass = 550.0
+drift_boost_curve = SubResource("Curve_moto")
+collision_shape_scale = Vector3(0.7, 0.9, 1.4)
+is_plow_class = false
+knockback_multiplier = 1.6
+ignores_size_hazards = false
+body_color = Color(0.5, 1, 0.3, 1)
+boost_power = 14.0

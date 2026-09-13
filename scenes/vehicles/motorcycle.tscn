@@ -1,0 +1,119 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://scripts/vehicles/vehicle_controller.gd" id="1"]
+[ext_resource type="Resource" path="res://assets/resources/motorcycle_stats.tres" id="2"]
+
+[sub_resource type="BoxShape3D" id="col_kart"]
+size = Vector3(1.0, 1.0, 2.4)
+
+[sub_resource type="BoxMesh" id="mesh_kart"]
+size = Vector3(0.9, 0.5, 2.2)
+
+[sub_resource type="SphereShape3D" id="detect_kart"]
+radius = 2.0
+
+[sub_resource type="BoxMesh" id="mesh_wheel"]
+size = Vector3(0.35, 0.35, 0.3)
+
+[node name="Motorcycle" type="VehicleBody3D"]
+mass = 550.0
+script = ExtResource("1")
+stats = ExtResource("2")
+peer_id = 1
+character_id = "human"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
+shape = SubResource("col_kart")
+
+[node name="Body" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.55, 0)
+mesh = SubResource("mesh_kart")
+
+[node name="WheelFL" type="VehicleWheel3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 0.0, 1.0)
+use_as_traction = true
+use_as_steering = true
+wheel_radius = 0.35
+wheel_rest_length = 0.3
+suspension_travel = 0.2
+suspension_stiffness = 50.0
+damping_compression = 4.0
+damping_relaxation = 4.0
+friction_slip = 2.5
+
+[node name="WheelFR" type="VehicleWheel3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45, 0.0, 1.0)
+use_as_traction = true
+use_as_steering = true
+wheel_radius = 0.35
+wheel_rest_length = 0.3
+suspension_travel = 0.2
+suspension_stiffness = 50.0
+damping_compression = 4.0
+damping_relaxation = 4.0
+friction_slip = 2.5
+
+[node name="WheelRL" type="VehicleWheel3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 0.0, -1.0)
+use_as_traction = true
+wheel_radius = 0.35
+wheel_rest_length = 0.3
+suspension_travel = 0.2
+suspension_stiffness = 50.0
+damping_compression = 4.0
+damping_relaxation = 4.0
+friction_slip = 2.5
+
+[node name="WheelRR" type="VehicleWheel3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45, 0.0, -1.0)
+use_as_traction = true
+wheel_radius = 0.35
+wheel_rest_length = 0.3
+suspension_travel = 0.2
+suspension_stiffness = 50.0
+damping_compression = 4.0
+damping_relaxation = 4.0
+friction_slip = 2.5
+
+[node name="WheelMeshFL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 0.0, 1.0)
+mesh = SubResource("mesh_wheel")
+
+[node name="WheelMeshFR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45, 0.0, 1.0)
+mesh = SubResource("mesh_wheel")
+
+[node name="WheelMeshRL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 0.0, -1.0)
+mesh = SubResource("mesh_wheel")
+
+[node name="WheelMeshRR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45, 0.0, -1.0)
+mesh = SubResource("mesh_wheel")
+
+[node name="Detector" type="Area3D" parent="."]
+collision_layer = 0
+collision_mask = 7
+monitoring = true
+monitorable = false
+
+[node name="DetectorShape" type="CollisionShape3D" parent="Detector"]
+shape = SubResource("detect_kart")
+
+[node name="DriftTrailAnchorL" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8, 0.2, -1.2)
+
+[node name="DriftTrailAnchorR" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.8, 0.2, -1.2)
+
+[node name="BoostTrailAnchor" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, -1.5)
+
+[node name="ItemHoldAnchor" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, 0)
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
+
+[connection signal="area_entered" from="Detector" to="." method="_on_detect_area"]
+[connection signal="area_exited" from="Detector" to="." method="_on_detect_exit"]
