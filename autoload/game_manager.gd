@@ -2,7 +2,7 @@ extends Node
 ## GameManager — machine a etats + modes Course / Grand Prix / Contre-la-montre (01 §1).
 ## Seul ce singleton mute current_phase. Transitions autoritaires serveur -> RPC.
 
-enum MatchPhase { MENU, LOBBY, COUNTDOWN, RACING, RESULTS, PAUSED }
+enum MatchPhase { MENU, LOBBY, COUNTDOWN, RACING, RESULTS, PAUSED, AUTH, BOARD }
 
 signal phase_changed(new_phase: int)
 signal race_started()
@@ -21,6 +21,11 @@ var gp_index: int = 0
 var gp_points: Dictionary = {} ## { nom: pts }
 var gp_final: bool = false
 var tt_last: Dictionary = {} ## { total, best, is_record, map }
+
+## Classement en ligne : contexte board + anti-double-soumission par course.
+var board_return: int = MatchPhase.MENU
+var board_map_id: String = "map1_neon"
+var results_submitted: bool = false
 
 ## Reglages persistants (section "settings" du meme cfg, defauts = comportement actuel).
 var settings_music: bool = true
@@ -50,6 +55,8 @@ const UI_SCENES := {
 	3: "res://scenes/ui/race_hud.tscn",
 	4: "res://scenes/ui/results_screen.tscn",
 	5: "res://scenes/ui/pause_menu.tscn",
+	6: "res://scenes/ui/auth_screen.tscn",
+	7: "res://scenes/ui/leaderboard_screen.tscn",
 }
 
 const MAP_SCENES := {
@@ -171,6 +178,7 @@ func start_countdown() -> void:
 	get_tree().paused = false
 	_load_map()
 	_spawn_racers()
+	results_submitted = false
 	change_phase(MatchPhase.COUNTDOWN)
 	_countdown_time = 3.5
 	set_process(true)

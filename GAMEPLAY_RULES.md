@@ -11,7 +11,7 @@ All 8 vehicles run the same script (`vehicle_controller.gd`), differentiated by 
 | Kart | 22.0 | 14.0 | 0.6 | 800 | 12.0 | 1.0 | — |
 | Car | 26.0 | 14.0 | 0.45 | 1100 | 13.0 | 1.0 | — |
 | Truck | 19.0 | 9.0 | 0.42 | 1900 | 11.0 | 0.4 | `is_plow_class` (immune to chicken/banana hits) |
-| Motorcycle | 25.0 | 19.0 | 0.85 | 550 | 14.0 | **1.6** | 2× lean animation; only vehicle whose knockback (>1.3) triggers full spin-out |
+| Motorcycle | 25.0 | 19.0 | 0.85 | 550 | 14.0 | **1.6** | 2× lean animation; only vehicle whose knockback (>1.3) triggers full spin-out; `tip_over_risk=1.0` (only class that can tip — see below) |
 | Bicycle | 17.0 | 10.0 | 0.95 | 350 | 10.0 | 1.2 | `ignores_size_hazards` (immune to shrink/lightning; less offroad penalty) |
 | Sport | 27.0 | 15.0 | 0.5 | 900 | 13.5 | 1.1 | — |
 | Taxi | 23.0 | 15.0 | 0.6 | 1000 | 12.0 | 0.9 | — |
@@ -36,6 +36,7 @@ Baseline note: the `.tscn` files still say `suspension_stiffness=50.0`, `damping
 - `KartStats.drift_boost_curve` is now read: `_drift_boost_mult(charge)` samples it at release charge and scales the tier durations `0.6/1.2/1.9s` by `0.85 + 0.30 × sample` (0.85–1.15). Thresholds (`0.35/0.7/0.99`), charge rate (`+0.45/s`), and `max_steer` are unchanged. Sequencing fix: the release block now reads `_was_drift` from the previous frame (it was overwritten by `_apply_lean()` in the same frame, so release boosts could never fire).
 - `KartStats.collision_shape_scale` is now read: the `CollisionShape3D` `BoxShape3D.size` is set from it (duplicated per instance). Values are used as absolute extents (a pure multiplier would exceed the 4.0 spawn-grid spacing, e.g. truck scene 3.8 × tres 2.3 = 8.74).
 - Drift: charges at `+0.45/s` to a `1.0` cap (same rate for all vehicles); release tiers give base boost duration `0.6s` (≥0.35 charge), `1.2s` (≥0.7), `1.9s` (≥0.99), each scaled by the curve multiplier above.
+- Tip-over moto (PROPOSED values, needs playtesting — not final): `KartStats.tip_over_risk` gates it (`1.0` moto, `0.0` everyone else). Instability builds `+0.8/s` while `|steer| × speed/top_speed > 0.55` (≈1.25 s of limit cornering to tip), decays `−1.2/s` below it; at 1.0 the bike eats its own >1.3-knockback full spin (`_hit_wobble`, same path as shells) + 4.0 s cooldown with no re-trigger. Telegraph: orange sparks past 0.7 build (existing 2× lean already steepens with the same steer input). Stacking cap: a single shared wobble tween (new hits restart instead of overlapping) + tip suppressed while a wobble tween runs. `max_steer`, drift charge/thresholds, boost durations untouched.
 - Steering special cases already implemented: penguin driver `×0.55` handling, shrink status `×0.8` handling, chicken-hit adds a `sin(t/90)×0.6` steering wobble, banana/slip adds `steer×1.8 + sin(t/120)×0.5`.
 - Offroad slowdown: `×0.62` normally, `×0.8` for `ignores_size_hazards` (Bicycle).
 
@@ -58,9 +59,11 @@ Baseline note: the `.tscn` files still say `suspension_stiffness=50.0`, `damping
 - No other settings screen exists — no controls-remap menu in any `.tscn`.
 
 ## 5. Game flow — current baseline
-Phases (`GameManager.MatchPhase`): `MENU → LOBBY → COUNTDOWN → RACING ⇄ PAUSED → RESULTS`, each mapped 1:1 to a UI scene (`main_menu`, `lobby_screen`, `countdown_overlay`, `race_hud`, `results_screen`, `pause_menu` — `PAUSED` appended last so `RESULTS` kept its value).
+Phases (`GameManager.MatchPhase`): `MENU → LOBBY → COUNTDOWN → RACING ⇄ PAUSED → RESULTS` + `AUTH` (appended last, value 6), each mapped 1:1 to a UI scene (`main_menu`, `lobby_screen`, `countdown_overlay`, `race_hud`, `results_screen`, `pause_menu`, `auth_screen`).
 
 - Pause (RACING only, Esc/Start/HUD button): `get_tree().paused = true` freezes physics, timers, chaos and controls; `race_timer` only advances in `RACING` so it freezes and resumes cleanly. Resume rebuilds the HUD; quit-to-menu unpauses via `_cleanup_race`.
+- Classement en ligne (phase `BOARD`, écran `leaderboard_screen.tscn`) : top 10 par map des comptes liés + rang perso hors top 10 (`BoardClient`, SQL `race_results` + RLS à faire tourner côté dashboard). Chaque course finie se soumet une fois (`results_submitted`, remis à zéro par `start_countdown`) ; invités : rang seul sur l'écran de résultats, jamais de top public.
+- Compte (phase `AUTH`, écran `auth_screen.tscn`, client natif `scripts/auth/supabase_auth.gd`) : gate / inscription + OTP email 6 chiffres / connexion (+ Google/Discord via navigateur + callback localhost PKCE) / mot de passe oublié. Config hors repo (`supabase_config.json` ignoré, voir `.example.json`) ; sans config, l'écran l'affiche et l'invité continue hors-ligne. Session en mémoire seule. OAuth lie au compte mot de passe existant (emails vérifiés, jamais de doublon créé côté client).
 - Countdown is fixed `3.5s`, race timeout is `600s` (10 min) auto-finish.
 - Results screen has 4 branches: single race podium, GP (grand prix) round, GP champion, and time-trial — all in one script (`results_screen.gd`).
 - Chaos events (`ChaosEventSystem`): first event fires after `12–18s` (code comment: "sooner, for the demo"), subsequent ones every `25–45s`; only one active at a time; weighted per map via `MapData.weighted_events`. Only enabled outside time-trial mode.
@@ -68,3 +71,4 @@ Phases (`GameManager.MatchPhase`): `MENU → LOBBY → COUNTDOWN → RACING ⇄ 
 ## 6. Consistency across vehicle/character types
 - Vehicle type (Kart/Car/Truck/etc.) and driver character (human/animal, 11 options) are independent selections — any character can pilot any vehicle. Keep this decoupling when adding new vehicles or characters; don't hardcode a character-vehicle pairing.
 - `CharacterData.voice_pitch` (11 values, 0.7–1.8) drives audio via `audio_manager.gd`: the engine-loop pitch is multiplied by the local driver's pitch (clamped 0.5–2.0), and the vocal one-shots (`chicken`, `hit`, `star`) are pitched the same way — character choice is audible. Unknown/missing character falls back to 1.0 (cached per id).
+- Locomotion pilote (PROPOSED values, needs playtesting — not final): farm FBX with a gait clip (cow/horse/zebra → `Armature|Run`; pig/sheep/llama/pug have Idle+Jump only → stay Idle) play it scaled `0.5→1.6` by speed/top_speed; all drivers lean `±0.15` max (`0.02` per m/s², back on throttle / forward on brake) and yaw `0.35` per steer unit into the turn, on an inner `Reactive` node (celebration/humiliation tweens + shrink/penguin scale stay on the outer root, shrink rebuild inherits lean gracefully at mini scale).

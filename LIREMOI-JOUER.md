@@ -66,7 +66,8 @@ whoosh de boost, bips 3-2-1-GO, impacts — tout est synthetise en WAV au demarr
 - **Voitures jouables** : Sport GT (SportsCar2), Taxi Jaune, SUV Baroudeur — carrosserie reelle
   auto-ajustee, roues statiques masquees (nos roues tournent/braquent), pilote cale dans l'habitacle.
 - **11 pilotes** : humain/croco/pingouin/poulet (procedural) + vache, cochon, mouton, cheval, lama,
-  carlin, zebre (modeles animes, Idle) — selection au lobby.
+  carlin, zebre (modeles animes : galop cadence par la vitesse pour vache/cheval/zebre, Idle sinon ;
+  tous penchent au gaz/frein et regardent dans les virages) — selection au lobby.
 - **Powerup/crush** : le Rayon Reducteur transforme le pilote en **mini-cochon** ;
   event chaos **Stampede de Dinos** (Trike/Raptor/Stego traversent la piste, renversent les karts).
 - **Decor vivant** : parking (Cop + berlines) sur Neon, T-Rex + Apatosaure + Parasaurolophus sur Swamp,

@@ -22,3 +22,6 @@ extends Resource
 @export var damping_compression: float = 4.0
 @export var damping_relaxation: float = 4.0
 @export var wheel_friction_slip: float = 10.5
+## Risque de versement (PHYSICS §2) : 0.0 = off. Seule la moto l'utilise (1.0).
+## Pilote par _update_tip_over(), qui reutilise le lean visuel + le spin-out >1.3.
+@export var tip_over_risk: float = 0.0

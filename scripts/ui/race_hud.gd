@@ -19,6 +19,9 @@ var _stand_box: VBoxContainer = null
 var _stand_t: float = 0.0
 var _auto_btn: Button = null
 var _had_effect: bool = false
+var _joy: Control = null
+var _drift_btn: Button = null
+var _touch_on: bool = true
 
 const ITEM_NAMES := {"reverse_gun": "🔫 Inverseur", "shrink_ray": "🔬 Reducteur", "chicken_storm": "🐔 Poulets", "banana_boost": "🍌 Boost", "rocket": "🚀 Pingouin", "banana": "🍌 Banane", "triple_banana": "🍌 Bananes", "mushroom": "🍄 Champi", "triple_mushroom": "🍄 Champis", "shell_green": "🐢 Carapace", "shell_red": "🔴 Rouge", "shield": "🛡️ Bouclier", "star": "⭐ Etoile", "lightning": "⚡ Foudre"}
 const ROULETTE := ["🍌", "🍄", "🐢", "🔴", "⭐", "⚡", "🔫", "🔬", "🐔", "🚀", "🛡️"]
@@ -28,6 +31,9 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_build()
+	get_viewport().size_changed.connect(_layout_touch)
+	_layout_touch()
+	_set_touch_visible(OS.has_feature("mobile") or OS.has_feature("web_android") or OS.has_feature("web_ios"))
 	ChaosEventSystem.chaos_event_triggered.connect(_on_chaos)
 	ChaosEventSystem.chaos_event_ended.connect(_on_chaos_end)
 	TeamManager.team_score_updated.connect(func(_a, _b) -> void: _refresh_team())
@@ -41,36 +47,36 @@ func _build() -> void:
 	_pos_lbl.add_theme_color_override("font_outline_color", Color.BLACK)
 	_pos_lbl.add_theme_constant_override("outline_size", 6)
 	_pos_lbl.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	_pos_lbl.position = Vector2(16, 12)
+	_pos_lbl.position = Vector2(24, 24)
 	add_child(_pos_lbl)
 	_time_lbl = Label.new()
 	_time_lbl.add_theme_font_size_override("font_size", 20)
-	_time_lbl.add_theme_color_override("font_color", Color(0.8, 0.9, 1))
-	_time_lbl.position = Vector2(16, 52)
+	_time_lbl.add_theme_color_override("font_color", Palette.SKY)
+	_time_lbl.position = Vector2(24, 62)
 	add_child(_time_lbl)
 	_lap_lbl = Label.new()
 	_lap_lbl.add_theme_font_size_override("font_size", 17)
 	_lap_lbl.add_theme_color_override("font_color", Color(1, 0.95, 0.6))
-	_lap_lbl.position = Vector2(16, 78)
+	_lap_lbl.position = Vector2(24, 88)
 	add_child(_lap_lbl)
 	_coin_lbl = Label.new()
 	_coin_lbl.add_theme_font_size_override("font_size", 24)
-	_coin_lbl.add_theme_color_override("font_color", Color(1, 0.85, 0.2))
+	_coin_lbl.add_theme_color_override("font_color", Palette.COIN)
 	_coin_lbl.add_theme_color_override("font_outline_color", Color.BLACK)
 	_coin_lbl.add_theme_constant_override("outline_size", 5)
-	_coin_lbl.position = Vector2(16, 104)
+	_coin_lbl.position = Vector2(24, 114)
 	add_child(_coin_lbl)
 	# Minimap haut-droite.
 	_minimap = _Minimap.new()
 	_minimap.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	_minimap.position = Vector2(-236, 12)
+	_minimap.position = Vector2(-244, 24)
 	_minimap.custom_minimum_size = Vector2(220, 160)
 	_minimap.size = Vector2(220, 160)
 	add_child(_minimap)
 	# Tour de classement live (top 8, facon Mario Kart).
 	_stand_box = VBoxContainer.new()
 	_stand_box.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	_stand_box.position = Vector2(-236, 180)
+	_stand_box.position = Vector2(-244, 192)
 	_stand_box.custom_minimum_size = Vector2(220, 200)
 	_stand_box.add_theme_constant_override("separation", 2)
 	add_child(_stand_box)
@@ -88,7 +94,7 @@ func _build() -> void:
 	# Equipe (duo/squad).
 	_team_lbl = Label.new()
 	_team_lbl.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	_team_lbl.position = Vector2(16, 134)
+	_team_lbl.position = Vector2(24, 144)
 	_team_lbl.add_theme_font_size_override("font_size", 18)
 	add_child(_team_lbl)
 	# Joystick bas-gauche.
@@ -100,6 +106,7 @@ func _build() -> void:
 	joy.size = Vector2(200, 200)
 	joy.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(joy)
+	_joy = joy
 	# Drift tactile : bouton au-dessus du joystick.
 	var drift := Button.new()
 	drift.text = "DRIFT"
@@ -109,6 +116,7 @@ func _build() -> void:
 	drift.button_down.connect(func() -> void: _set_drift(true))
 	drift.button_up.connect(func() -> void: _set_drift(false))
 	add_child(drift)
+	_drift_btn = drift
 	# Toggle auto-acceleration (spec 01 §7) : ON = tactile une-main, OFF = manuel.
 	_auto_btn = Button.new()
 	_auto_btn.text = "AUTO: ON"
@@ -170,6 +178,40 @@ func _set_drift(on: bool) -> void:
 	var p := get_tree().get_first_node_in_group("local_player")
 	if p:
 		p.set("touch_drift", on)
+
+## Tactile (UI_UX §3) : taille relative au viewport + visibilite selon le peripherique.
+func _layout_touch() -> void:
+	if _joy == null or _drift_btn == null or _auto_btn == null or _item_btn == null:
+		return
+	var m := minf(get_viewport_rect().size.x, get_viewport_rect().size.y)
+	var side := clampf(m * 0.28, 140.0, 220.0)
+	var k := side / 200.0
+	_joy.size = Vector2(side, side)
+	_joy.position = Vector2(24, -side - 24)
+	_drift_btn.custom_minimum_size = Vector2(120 * k, 56)
+	_drift_btn.position = Vector2(24 + side + 16, -120)
+	_auto_btn.custom_minimum_size = Vector2(140 * k, 56)
+	_auto_btn.position = Vector2(24 + side + 16, -190)
+	var i2 := clampf(m * 0.21, 110.0, 170.0)
+	_item_btn.custom_minimum_size = Vector2(i2, i2)
+	_item_btn.position = Vector2(-i2 - 24, -i2 - 24)
+
+func _set_touch_visible(on: bool) -> void:
+	if on == _touch_on:
+		return
+	_touch_on = on
+	# Item + pause restent visibles (souris) ; seul le cluster tactile se cache.
+	_joy.visible = on
+	_drift_btn.visible = on
+	_auto_btn.visible = on
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey and not event.echo:
+		_set_touch_visible(false)
+	elif event is InputEventJoypadButton or event is InputEventJoypadMotion:
+		_set_touch_visible(false)
+	elif event is InputEventScreenTouch or event is InputEventScreenDrag:
+		_set_touch_visible(true)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause"):

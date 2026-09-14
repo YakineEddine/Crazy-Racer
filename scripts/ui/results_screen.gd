@@ -4,6 +4,9 @@ extends Control
 var _xp: int = 0
 var _xp_target: int = 0
 var _xp_lbl: Label = null
+var _board_client: SupaAuth = null
+var _rank_lbl: Label = null
+var _submit_total: int = 0
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -16,7 +19,86 @@ func _ready() -> void:
 			_build_gp_manche()
 	else:
 		_build_single()
+	_submit_and_rank()
 	_play_anims()
+
+## Classement en ligne (UI_UX §6) : soumission unique par course + rang perso.
+## Invites : rang seul, jamais de top public. Hors-ligne : rien ne change.
+
+func _with_board(defs: Array) -> Array:
+	if SupaAuth.is_signed_in():
+		var out := defs.duplicate()
+		out.append(["🏆 CLASSEMENT", func() -> void:
+			GameManager.board_return = GameManager.MatchPhase.RESULTS
+			GameManager.board_map_id = GameManager.current_map_id
+			GameManager.change_phase(GameManager.MatchPhase.BOARD)
+		])
+		return out
+	return defs
+
+func _local_total_ms() -> int:
+	return maxi(1, int(GameManager.race_timer * 1000.0))
+
+func _submit_and_rank() -> void:
+	# Pas de soumission sur l'ecran champion (aucune course courue pour lui).
+	if GameManager.mode == "gp" and GameManager.gp_final:
+		return
+	if GameManager.results.is_empty():
+		return
+	_board_client = SupaAuth.new()
+	add_child(_board_client)
+	if not _board_client.configure():
+		_board_client.queue_free()
+		_board_client = null
+		return
+	_board_client.db_ok.connect(_on_board)
+	_board_client.db_fail.connect(_on_board_fail)
+	if not GameManager.results_submitted:
+		GameManager.results_submitted = true
+		_submit_total = _local_total_ms()
+		_board_client.db_post("/rest/v1/race_results", _submit_row(_submit_total), "submit")
+	else:
+		_submit_total = _local_total_ms()
+		_fetch_rank()
+
+func _submit_row(total_ms: int) -> Dictionary:
+	var uid := multiplayer.get_unique_id()
+	var user_id := ""
+	if SupaAuth.is_signed_in():
+		user_id = str(SupaAuth.session.get("user_id", ""))
+	var members := ""
+	var tid := TeamManager.team_of(uid)
+	if tid != -1:
+		var mates: Array = TeamManager.teams.get(tid, [])
+		if mates.size() > 1:
+			var parts := PackedStringArray()
+			for pid in mates:
+				parts.append(GameManager.get_display_name(int(pid)))
+			members = " | ".join(parts)
+	return BoardClient.build_submit_row(user_id, GameManager.get_display_name(uid),
+		GameManager.current_map_id, GameManager.mode, total_ms, "", members)
+
+func _fetch_rank() -> void:
+	if _board_client == null:
+		return
+	_board_client.db_get(BoardClient.rank_path(GameManager.current_map_id, _submit_total),
+		"rank", ["Prefer: count=exact"])
+
+func _on_board(tag: String, data: Variant) -> void:
+	if tag == "submit":
+		_fetch_rank()
+	elif tag == "rank" and data is Dictionary:
+		_show_rank(int(data.get("total", 0)) + 1)
+
+func _on_board_fail(_tag: String, _message: String) -> void:
+	if is_instance_valid(_rank_lbl):
+		_rank_lbl.queue_free()
+		_rank_lbl = null
+
+func _show_rank(rank: int) -> void:
+	if rank <= 0 or not is_instance_valid(_rank_lbl):
+		return
+	_rank_lbl.text = "Votre rang : %d" % rank
 
 func _root() -> VBoxContainer:
 	var bg := ColorRect.new()
@@ -93,9 +175,15 @@ func _build_single() -> void:
 	_xp_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_xp_lbl.add_theme_font_size_override("font_size", 24)
 	vb.add_child(_xp_lbl)
+	_rank_lbl = Label.new()
+	_rank_lbl.text = ""
+	_rank_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_rank_lbl.add_theme_font_size_override("font_size", 20)
+	_rank_lbl.add_theme_color_override("font_color", Color(1, 0.88, 0.3))
+	vb.add_child(_rank_lbl)
 	set_process(true)
 	_confetti()
-	_buttons(vb, [["REMATCH 🔁", func() -> void: GameManager.rematch()], ["Menu", func() -> void: GameManager.back_to_menu()]])
+	_buttons(vb, _with_board([["REMATCH 🔁", func() -> void: GameManager.rematch()], ["Menu", func() -> void: GameManager.back_to_menu()]]))
 
 func _podium_card(r: Dictionary, i: int) -> PanelContainer:
 	var p := PanelContainer.new()
@@ -176,7 +264,13 @@ func _build_gp_manche() -> void:
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		l.add_theme_font_size_override("font_size", 20)
 		vb.add_child(l)
-	_buttons(vb, [["Manche suivante ▶", func() -> void: GameManager.gp_next()], ["Abandonner", func() -> void: GameManager.back_to_menu()]])
+	_rank_lbl = Label.new()
+	_rank_lbl.text = ""
+	_rank_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_rank_lbl.add_theme_font_size_override("font_size", 20)
+	_rank_lbl.add_theme_color_override("font_color", Color(1, 0.88, 0.3))
+	vb.add_child(_rank_lbl)
+	_buttons(vb, _with_board([["Manche suivante ▶", func() -> void: GameManager.gp_next()], ["Abandonner", func() -> void: GameManager.back_to_menu()]]))
 
 func _build_champion() -> void:
 	var vb := _root()
@@ -194,7 +288,7 @@ func _build_champion() -> void:
 		vb.add_child(l)
 	Audio.play("star")
 	_confetti()
-	_buttons(vb, [["Nouveau GP 🔁", func() -> void: GameManager.start_gp_lobby(GameManager.current_format)], ["Menu", func() -> void: GameManager.back_to_menu()]])
+	_buttons(vb, _with_board([["Nouveau GP 🔁", func() -> void: GameManager.start_gp_lobby(GameManager.current_format)], ["Menu", func() -> void: GameManager.back_to_menu()]]))
 
 # --- Contre-la-montre ---
 
@@ -230,7 +324,13 @@ func _build_tt() -> void:
 			rl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			rl.add_theme_font_size_override("font_size", 22)
 			vb.add_child(rl)
-	_buttons(vb, [["Recommencer 🔁", func() -> void: GameManager.start_tt(GameManager.current_map_id)], ["Menu", func() -> void: GameManager.back_to_menu()]])
+	_rank_lbl = Label.new()
+	_rank_lbl.text = ""
+	_rank_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_rank_lbl.add_theme_font_size_override("font_size", 20)
+	_rank_lbl.add_theme_color_override("font_color", Color(1, 0.88, 0.3))
+	vb.add_child(_rank_lbl)
+	_buttons(vb, _with_board([["Recommencer 🔁", func() -> void: GameManager.start_tt(GameManager.current_map_id)], ["Menu", func() -> void: GameManager.back_to_menu()]]))
 
 func _play_anims() -> void:
 	var vehicles := get_tree().get_nodes_in_group("vehicles")

@@ -16,7 +16,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 config/name="Crazy Racer"
 config/description="Party kart racer chaotique — 8 vehicules, 14 objets, 4 maps, chaos events."
-config/version="1.0.2"
+config/version="1.1.0"
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"

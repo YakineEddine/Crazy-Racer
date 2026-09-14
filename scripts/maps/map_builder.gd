@@ -24,6 +24,22 @@ const MAP_RES := {
 # Note: map3 path fallback (le .tres s'appelle map3_data.tres).
 const MAP_RES_FALLBACK := "res://assets/resources/map3_data.tres"
 
+## Reskin map3_ice : tuiles Kenney (visuel seul, PAS de collision — les boites
+## procedurales restent la surface physique). Peinture source le long de Z,
+## coins base +X/+Z (mesure sur les vertex, pas suppose).
+const KENNEY_DIR := "res://assets/models/tracks_kenney/"
+const KENNEY_TILES := {
+	"straight_ns": ["roadStraight.glb", 0],
+	"straight_ew": ["roadStraight.glb", 90],
+	"corner_se": ["roadCornerSmall.glb", 0],
+	"corner_en": ["roadCornerSmall.glb", 90],
+	"corner_nw": ["roadCornerSmall.glb", 180],
+	"corner_ws": ["roadCornerSmall.glb", 270],
+	"filler": ["roadCornerSmallSquare.glb", 0],
+}
+static var _kenney_lib: MeshLibrary = null
+static var _kenney_ids := {}
+
 func _ready() -> void:
 	add_to_group("maps")
 	_rng.randomize()
@@ -62,11 +78,161 @@ func _build_all() -> void:
 	_build_drivable_area()
 	_build_soft_zones()
 	_build_dressing()
-	# GridMap requis par le contrat (tuiles modulaires) : stub vide pour conformite.
+	# GridMap : stub vide (contrat) sauf map3_ice, pavee de tuiles Kenney (visuel seul).
 	var gm := GridMap.new()
 	gm.name = "GridMap"
-	gm.cell_size = Vector3(10, 1, 10)
+	if map_id == "map3_ice":
+		_build_kenney_road(gm)
+	else:
+		gm.cell_size = Vector3(10, 1, 10)
 	add_child(gm)
+
+## Pavage map3_ice : MeshLibrary construite une fois (baked rotations, materiaux
+## portes), cellules 1m derivees des memes constantes que is_on_road (pas de
+## second systeme, pas de nouveau champ MapData). Orientations bakees : pas de
+## pari sur la convention d'orientation du GridMap.
+func _build_kenney_road(gm: GridMap) -> void:
+	var lib := _kenney_library()
+	if lib == null or lib.get_item_list().is_empty():
+		push_warning("[MapBuilder] tuiles Kenney indisponibles, map3 sans reskin")
+		gm.cell_size = Vector3(10, 1, 10)
+		return
+	gm.cell_size = Vector3(1, 1, 1)
+	gm.mesh_library = lib
+	gm.position.y = 0.16 ## dessus des boites (top 0.15), sous les pads
+	var straight_ns := int(_kenney_ids.get("straight_ns", 1))
+	var straight_ew := int(_kenney_ids.get("straight_ew", 1))
+	var corner_se := int(_kenney_ids.get("corner_se", 1))
+	var corner_en := int(_kenney_ids.get("corner_en", 1))
+	var corner_nw := int(_kenney_ids.get("corner_nw", 1))
+	var corner_ws := int(_kenney_ids.get("corner_ws", 1))
+	var filler := int(_kenney_ids.get("filler", 1))
+	for cx in range(-70, 71):
+		for cz in range(-50, 51):
+			var c := Vector3(float(cx) + 0.5, 0.0, float(cz) - 0.5)
+			var zone := _road_zone(c)
+			if zone == 0:
+				continue
+			var item := filler
+			if zone == 1 or zone == 4:
+				item = straight_ew ## lignes droites + raccourci : route selon X
+			elif zone == 2:
+				item = straight_ns ## cotes : route selon Z
+			else:
+				# Coudes : coins orientes par le masque, remplissage sinon.
+				var e := is_on_road(c + Vector3(1, 0, 0))
+				var w := is_on_road(c + Vector3(-1, 0, 0))
+				var n := is_on_road(c + Vector3(0, 0, -1))
+				var s := is_on_road(c + Vector3(0, 0, 1))
+				if e and s and not n and not w:
+					item = corner_se
+				elif e and n and not w and not s:
+					item = corner_en
+				elif n and w and not e and not s:
+					item = corner_nw
+				elif w and s and not e and not n:
+					item = corner_ws
+			gm.set_cell_item(Vector3i(cx, 0, cz), item, 0)
+
+## MeshLibrary partagee (cachee : survit aux rematchs). Rotations bakees dans
+## le mesh autour du centre tuile (0.5, 0, -0.5) : toutes les cellules en
+## orientation 0, footprint [0,1]x[-1,0] preserve.
+static func _kenney_library() -> MeshLibrary:
+	if _kenney_lib != null and is_instance_valid(_kenney_lib) and not _kenney_lib.get_item_list().is_empty():
+		return _kenney_lib
+	var lib := MeshLibrary.new()
+	var next_id := 1
+	for key in KENNEY_TILES:
+		var spec: Array = KENNEY_TILES[key]
+		var parts := _tile_parts(str(spec[0]))
+		var src: ArrayMesh = parts[0]
+		if src == null:
+			push_warning("[MapBuilder] tuile illisible : " + str(spec[0]))
+			continue
+		var baked := _rot_tile_mesh(src, float(spec[1]), parts[1])
+		if baked.get_surface_count() == 0:
+			push_warning("[MapBuilder] bake vide : " + str(spec[0]))
+			continue
+		lib.create_item(next_id)
+		lib.set_item_name(next_id, str(key))
+		lib.set_item_mesh(next_id, baked)
+		_kenney_ids[key] = next_id
+		next_id += 1
+	if lib.get_item_list().is_empty():
+		return null
+	_kenney_lib = lib
+	return lib
+
+## [mesh ArrayMesh, materiaux Array] depuis le .glb (materiaux actifs, pas devines).
+static func _tile_parts(file: String) -> Array:
+	var ps := load(KENNEY_DIR + file) as PackedScene
+	if ps == null:
+		return [null, []]
+	var n := ps.instantiate() as Node3D
+	if n == null:
+		return [null, []]
+	var mesh: ArrayMesh = null
+	var mats: Array = []
+	for mi in n.find_children("*", "MeshInstance3D", true, false):
+		var m := (mi as MeshInstance3D).mesh
+		if m is ArrayMesh:
+			mesh = m as ArrayMesh
+			for s in m.get_surface_count():
+				mats.append((mi as MeshInstance3D).get_active_material(s))
+			break
+	n.free()
+	return [mesh, mats]
+
+static func _rot_tile_mesh(src: ArrayMesh, deg: float, mats: Array) -> ArrayMesh:
+	var out := ArrayMesh.new()
+	var b := Basis(Vector3.UP, deg_to_rad(deg))
+	var c := Vector3(0.5, 0.0, -0.5)
+	for s in src.get_surface_count():
+		var arrays := src.surface_get_arrays(s)
+		if arrays[Mesh.ARRAY_VERTEX] == null:
+			continue
+		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var ok_n := arrays[Mesh.ARRAY_NORMAL] != null
+		var ok_t := arrays[Mesh.ARRAY_TANGENT] != null
+		var norms := PackedVector3Array()
+		var tans := PackedFloat32Array()
+		if ok_n:
+			norms = arrays[Mesh.ARRAY_NORMAL]
+		if ok_t:
+			tans = arrays[Mesh.ARRAY_TANGENT]
+		if norms.size() != verts.size() or (ok_t and tans.size() != verts.size() * 4):
+			continue ## garde-fou : attributs incomplets, surface sautee
+		var nv := PackedVector3Array()
+		nv.resize(verts.size())
+		var nn := PackedVector3Array()
+		nn.resize(verts.size())
+		var nt := PackedFloat32Array()
+		nt.resize(tans.size())
+		for i in verts.size():
+			nv[i] = c + b * (verts[i] - c)
+			if ok_n:
+				nn[i] = b * norms[i]
+			if ok_t:
+				var t := Vector3(tans[i * 4], tans[i * 4 + 1], tans[i * 4 + 2])
+				var rt := b * t
+				nt[i * 4] = rt.x
+				nt[i * 4 + 1] = rt.y
+				nt[i * 4 + 2] = rt.z
+				nt[i * 4 + 3] = tans[i * 4 + 3]
+		arrays[Mesh.ARRAY_VERTEX] = nv
+		if ok_n:
+			arrays[Mesh.ARRAY_NORMAL] = nn
+		if ok_t:
+			arrays[Mesh.ARRAY_TANGENT] = nt
+		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+		var mat: Material = null
+		if s < mats.size() and mats[s] is Material:
+			mat = mats[s]
+		if mat == null:
+			mat = src.surface_get_material(s)
+		if mat != null:
+			out.surface_set_material(out.get_surface_count() - 1, mat)
+	return out
 
 # --- Environnement ---
 
@@ -185,12 +351,28 @@ func _build_ground_and_track() -> void:
 
 func is_on_road(p: Vector3) -> bool:
 	# Anneau + raccourci central. Tout le reste = offroad (ralenti).
+	return _road_zone(p) != 0
+
+## Zone de piste : 0 hors-piste, 1 ligne droite (route selon X), 2 cote (selon Z),
+## 3 coude (les deux bandes a la fois), 4 raccourci. Memes constantes que
+## l'ancien test direct (semantique identique, verifiee en jeu).
+func _road_zone(p: Vector3) -> int:
 	var on_straight := absf(p.x) <= 67.0 and ((p.z >= -46.5 and p.z <= -33.5) or (p.z >= 33.5 and p.z <= 46.5))
 	var on_side := absf(p.z) <= 46.5 and ((p.x >= 53.5 and p.x <= 66.5) or (p.x >= -66.5 and p.x <= -53.5))
 	var on_shortcut := absf(p.z) <= 4.5 and absf(p.x) <= 51.0
-	return on_straight or on_side or on_shortcut
+	if on_straight and on_side:
+		return 3
+	if on_straight:
+		return 1
+	if on_side:
+		return 2
+	if on_shortcut:
+		return 4
+	return 0
 
 func _build_road_lines() -> void:
+	if map_id == "map3_ice":
+		return ## marquages portes par les tuiles (pointilles clipperaient a y 0.15..0.19 vs 0.18)
 	# Pointilles centraux facon Mario Kart.
 	var mat := _mat(Color(1, 1, 1, 0.85), 0.6)
 	for x in range(-56, 61, 8):

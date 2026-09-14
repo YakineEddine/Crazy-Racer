@@ -55,6 +55,17 @@ var _pad_cd: float = 0.0
 var _draft: float = 0.0
 var _draft_cd: float = 0.0
 var _pre_go: bool = false
+var _prev_speed: float = 0.0 ## pour l'accel longitudinale du pilote (PHYSICS §3)
+var _tip_build: float = 0.0 ## 0..1 instabilite moto (PHYSICS §2)
+var _tip_cd: float = 0.0 ## cooldown anti-chaine apres un versement
+var _wobble_tween: Tween = null ## un seul tween de wobble a la fois (items + tip)
+
+## Tip-over moto, valeurs PROPOSEES a playtester (pas finales) : seuil de charge,
+## vitesse de montee/descente, cooldown. max_steer/drift/boost intouches.
+const TIP_LOAD_THRESHOLD := 0.55
+const TIP_BUILD_RATE := 0.8
+const TIP_DECAY_RATE := 1.2
+const TIP_COOLDOWN := 4.0
 
 func _ready() -> void:
 	add_to_group("vehicles")
@@ -156,6 +167,7 @@ func reset_effects() -> void:
 	boost_charge = 0.0
 	boosting_time = 0.0
 	_draft = 0.0
+	_prev_speed = 0.0
 	scale = _orig_scale
 	_refresh_driver_model()
 
@@ -226,6 +238,7 @@ func _physics_process(delta: float) -> void:
 	var max_speed := stats.top_speed * soft_slow_factor * off * star_mult * rubber * (1.0 + coins * 0.015)
 	if shrink_timer > 0.0:
 		max_speed *= 0.6
+	_update_tip_over(delta, steer, speed)
 	var target_force := stats.acceleration * 60.0 * throttle * soft_slow_factor
 	if shrink_timer > 0.0:
 		target_force *= 0.55
@@ -284,6 +297,7 @@ func _physics_process(delta: float) -> void:
 			Audio.play("boost")
 			VfxFactory.burst(self, "boost")
 		boost_charge = 0.0
+	_update_driver_motion(delta, steer, speed)
 	if gravity_scale < 0.0:
 		apply_central_force(Vector3.UP * 9.8 * mass * 2.0)
 	# Roues visuelles : spin + braquage avant.
@@ -309,6 +323,22 @@ func _apply_lean(steer: float, drifting: bool) -> void:
 			target_z *= 2.0
 		body.rotation.z = lerpf(body.rotation.z, target_z, 0.15)
 
+## Locomotion pilote (PHYSICS §3) : 100% decouplee du choix vehicule — lit la
+## vitesse/steer du corps, ecrit seulement le wrapper "Reactive" + l'allure.
+## Signes §-1 intouches (on lit steer, on n'y touche pas) : facing -Z, +steer = gauche.
+func _update_driver_motion(delta: float, steer: float, speed: float) -> void:
+	var accel := 0.0
+	if delta > 0.0001:
+		accel = (speed - _prev_speed) / delta
+	_prev_speed = speed
+	if _driver == null:
+		return
+	var top := 22.0
+	if stats != null:
+		top = maxf(stats.top_speed, 1.0)
+	var lean := clampf(accel * DriverBuilder.REACT_LEAN_K, -DriverBuilder.REACT_LEAN_MAX, DriverBuilder.REACT_LEAN_MAX)
+	DriverBuilder.apply_motion(_driver, lean, steer * DriverBuilder.REACT_YAW_K, speed / top)
+
 func _squash_stretch() -> void:
 	var body: Node3D = get_node_or_null("Body") as Node3D
 	if body == null:
@@ -322,6 +352,32 @@ func _drift_boost_mult(charge: float) -> float:
 		return 1.0
 	var g := clampf(stats.drift_boost_curve.sample(clampf(charge, 0.0, 1.0)), 0.0, 1.0)
 	return 0.85 + 0.30 * g
+
+## Tip-over moto (PHYSICS §2), pilote par KartStats.tip_over_risk (0.0 = off).
+## Reutilise : le lean visuel 2x existant comme telegraphe (il est pilote par le meme
+## steer d'entree) + le spin-out >1.3 existant comme penalite. Pas de nouveau systeme.
+func _update_tip_over(delta: float, steer: float, speed: float) -> void:
+	if stats == null or stats.tip_over_risk <= 0.0:
+		_tip_build = 0.0
+		return
+	if _tip_cd > 0.0:
+		return
+	var top := maxf(stats.top_speed, 1.0)
+	var load := absf(steer) * (speed / top)
+	if load > TIP_LOAD_THRESHOLD:
+		_tip_build = minf(1.0, _tip_build + delta * TIP_BUILD_RATE * stats.tip_over_risk)
+		if _tip_build >= 0.7 and _tip_build < 1.0 and randf() < delta * 6.0:
+			VfxFactory.burst_colored(self, Color(1.0, 0.45, 0.1)) ## telegraphe pre-verse
+		if _tip_build >= 1.0:
+			# Jamais pendant un wobble d'item : on garde la charge a 1.0, ca part
+			# a la fin du wobble si toujours en limite (pas de double-stun).
+			if _wobble_tween == null or not _wobble_tween.is_running():
+				_tip_build = 0.0
+				_tip_cd = TIP_COOLDOWN
+				_hit_wobble() ## spin complet moto (mult 1.6 > 1.3), meme path que les items
+				Audio.play("hit")
+	else:
+		_tip_build = maxf(0.0, _tip_build - delta * TIP_DECAY_RATE)
 
 func _spawn_skid(anchor_name: String) -> void:
 	var anchor := get_node_or_null(anchor_name) as Marker3D
@@ -358,6 +414,7 @@ func _tick_timers(delta: float) -> void:
 		if penguin_timer <= 0.0:
 			_refresh_driver_model()
 	if slip_timer > 0.0: slip_timer -= delta
+	if _tip_cd > 0.0: _tip_cd -= delta
 	if star_timer > 0.0:
 		star_timer -= delta
 		if randf() < delta * 4.0:
@@ -600,7 +657,12 @@ func _hit_wobble() -> void:
 	var body: Node3D = get_node_or_null("Body") as Node3D
 	if body == null:
 		return
+	# Un seul tween de wobble a la fois : un nouveau coup redemarre au lieu d'empiler
+	# (cap anti chain-stun items + tip-over, sans second timer).
+	if _wobble_tween != null and _wobble_tween.is_valid():
+		_wobble_tween.kill()
 	var tw := create_tween()
+	_wobble_tween = tw
 	if mult > 1.3:
 		tw.tween_property(body, "rotation:y", body.rotation.y + TAU, 0.5)
 	else:

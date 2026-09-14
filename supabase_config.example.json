@@ -1,0 +1,5 @@
+{
+  "_readme": "Copiez ce fichier vers supabase_config.json (meme dossier que project.godot) et collez vos valeurs. supabase_config.json est ignore par git et ne doit JAMAIS etre commite. L'anon key est publique par design (livree dans le client), mais gardez l'URL hors du repo.",
+  "supabaseUrl": "https://xyzcompany.supabase.co",
+  "supabaseKey": "PASTE-ANON-KEY-HERE"
+}

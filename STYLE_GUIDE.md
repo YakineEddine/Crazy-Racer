@@ -20,7 +20,7 @@ The project has no centralized palette — these are the colors already repeated
 | Item icon colors | reverse `(1,0.2,0.2)`, shrink `(0.4,0.6,1)`, chicken `(1,1,1)`, banana `(1,0.9,0.2)`, rocket `(0.3,0.9,1)` | Item icon button + HUD flash |
 | Chaos event banner colors | gravity `(0.6,0.3,1)`, meteor `(1,0.4,0.1)`, collapse `(0.3,0.8,0.2)`, dino `(1,0.2,0.2)` | HUD chaos banner |
 
-Rule: no new hex/RGB value for a role already covered above — reuse it. If consolidating, extract these into named `const` in a shared script (e.g. `scripts/ui/palette.gd`) rather than retyping `Color(1,0.88,0.3)` in 6+ files.
+Rule: no new hex/RGB value for a role already covered above — reuse it. Shared roles now live as named `const` in `scripts/ui/palette.gd` (`NAVY_TOP/BOTTOM, GOLD, SKY, MUTED, BRAND, PANEL, COIN`), used by `main_menu.gd` and `race_hud.gd` — extend that file instead of retyping literals on screens you touch.
 
 ## 2. Typography — current state
 
@@ -41,11 +41,11 @@ Rule: no new hex/RGB value for a role already covered above — reuse it. If con
 - `styles/focus` → transparent `StyleBoxFlat` with 3px magenta border — keyboard/gamepad focus ring (magenta-on-navy; over a magenta hover it yields to the hover fill, which already signals the button)
 - `font_sizes/font_size = 22` for `Button`/`Label` (+ theme `default_font`/`default_font_size`, see §2)
 
-Toggle buttons (format select, map select, ready) use `toggle_mode = true` — same normal/hover/pressed styling applies, so a "selected" toggle looks identical to a "hovered" one.
+Toggle buttons (format select, map select, ready) use `toggle_mode = true` — in `main_menu.gd` the toggled-on button additionally gets a per-instance `normal` override (navy + 3px gold border), so selected no longer looks identical to hovered. (Lobby/ready toggles still use the plain theme styles.)
 
 ## 4. Layout patterns (as currently built)
 - Every UI scene is a single `Control` root built entirely in `_ready()`/`_build()` — no child nodes saved in the `.tscn` files. Follow this pattern for new UI rather than hand-building nodes in the editor, to stay consistent with the rest of the codebase.
-- HUD elements are anchor-positioned relative to screen corners (e.g. position/lap top-left, minimap/standings top-right, item button bottom-right, joystick bottom-left) — keep this corner-anchored layout for any new HUD element so it scales across the fixed 1280×720 `canvas_items`/`expand` stretch mode.
+- HUD elements are anchor-positioned relative to screen corners (e.g. position/lap top-left, minimap/standings top-right, item button bottom-right, joystick bottom-left) — keep this corner-anchored layout for any new HUD element so it scales across the fixed 1280×720 `canvas_items`/`expand` stretch mode. Flush-edge offsets are ≥24px; the touch cluster (joystick+DRIFT+AUTO) scales with `min(viewport)` (`×0.28`, clamped 140–220) and auto-hides on keyboard/gamepad input, reappearing on touch (item/pause buttons stay visible for mouse users).
 
 ## 5. Effects (VFX) — current state
 - One shader in the project: `shaders/gravity_flip.gdshader` (canvas_item, used for the HUD gravity-inversion overlay tint, `tint=vec4(0.55,0.3,1.0,0.25)`, subtle sine wobble).
