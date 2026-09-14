@@ -129,17 +129,17 @@ func _build() -> void:
 	rec.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vb.add_child(rec)
 	var hint := Label.new()
-	hint.text = "Clavier : ↑ accelerer • ↓ freiner • ←/→ diriger • Espace drift • E item  |  Tactile : joystick + AUTO + bouton"
+	hint.text = "Clavier : ↑/W accelerer • ↓/S freiner • ←/A →/D diriger • Espace drift • E item  |  Tactile : joystick + AUTO + bouton"
 	hint.add_theme_font_size_override("font_size", 14)
 	hint.add_theme_color_override("font_color", Color(0.7, 0.7, 0.8))
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vb.add_child(hint)
 	var mute := Button.new()
-	mute.text = "♪ Musique : ON" if Audio.music_on else "♪ Musique : OFF"
+	mute.text = "♪ Musique : ON" if GameManager.settings_music else "♪ Musique : OFF"
 	mute.custom_minimum_size = Vector2(200, 40)
 	mute.pressed.connect(func() -> void:
-		Audio.toggle_music()
-		mute.text = "♪ Musique : ON" if Audio.music_on else "♪ Musique : OFF"
+		GameManager.set_music_enabled(not GameManager.settings_music)
+		mute.text = "♪ Musique : ON" if GameManager.settings_music else "♪ Musique : OFF"
 	)
 	var mc := HBoxContainer.new()
 	mc.alignment = BoxContainer.ALIGNMENT_CENTER

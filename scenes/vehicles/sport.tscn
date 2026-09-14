@@ -16,7 +16,7 @@ radius = 2.0
 size = Vector3(0.35, 0.35, 0.3)
 
 [node name="Sport" type="VehicleBody3D"]
-mass = 1100.0
+mass = 900.0
 script = ExtResource("1")
 stats = ExtResource("2")
 peer_id = 1

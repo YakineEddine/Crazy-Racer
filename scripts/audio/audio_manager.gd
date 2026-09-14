@@ -11,6 +11,12 @@ var _music: AudioStreamPlayer = null
 var music_on: bool = true
 var _streams: Dictionary = {}
 
+## SFX vocaux : colores par la voix du pilote local (CharacterData.voice_pitch).
+const VOICE_SFX := ["chicken", "hit", "star"]
+const CHAR_RES := "res://assets/resources/character_%s.tres"
+
+var _char_cache: Dictionary = {}
+
 const RATE := 22050
 
 func _ready() -> void:
@@ -32,7 +38,6 @@ func _ready() -> void:
 	_music.stream = _build_music()
 	_music.volume_db = -20.0
 	add_child(_music)
-	_music.play()
 	_streams["pickup"] = _slide(500.0, 1050.0, 0.12, 0.5)
 	_streams["roulette"] = _tone(1250.0, 0.04, 0.3)
 	_streams["coin"] = _melody([[988.0, 0.07], [1319.0, 0.22]])
@@ -46,6 +51,9 @@ func _ready() -> void:
 	_streams["star"] = _melody([[660.0, 0.09], [830.0, 0.09], [990.0, 0.09], [1320.0, 0.25]])
 	_streams["lightning"] = _noise_hit(0.6, 0.6)
 	_streams["chicken"] = _melody([[700.0, 0.06], [500.0, 0.06], [820.0, 0.12]])
+	# Reglages deja charges par GameManager (autoload precedent) : on les applique
+	# (bus + musique + qualite particules) au lieu des valeurs en dur d'avant.
+	GameManager.apply_settings()
 
 func play(sfx: String) -> void:
 	if not _streams.has(sfx) or _players.is_empty():
@@ -53,8 +61,30 @@ func play(sfx: String) -> void:
 	var p: AudioStreamPlayer = _players[_idx]
 	_idx = (_idx + 1) % _players.size()
 	p.stream = _streams[sfx]
-	p.pitch_scale = randf_range(0.97, 1.03)
+	var vmult := _local_voice_pitch() if sfx in VOICE_SFX else 1.0
+	p.pitch_scale = randf_range(0.97, 1.03) * vmult
 	p.play()
+
+## Voix du pilote local : croco grave (0.7) … poulet aigu (1.8). Repli 1.0.
+func voice_pitch_for(cid: String) -> float:
+	if _char_cache.has(cid):
+		return float(_char_cache[cid])
+	var pitch := 1.0
+	var path := CHAR_RES % cid
+	if ResourceLoader.exists(path):
+		var cd := load(path) as CharacterData
+		if cd:
+			pitch = clampf(float(cd.voice_pitch), 0.5, 2.0)
+	_char_cache[cid] = pitch
+	return pitch
+
+func _local_voice_pitch() -> float:
+	if get_tree() == null:
+		return 1.0
+	var v: Node = get_tree().get_first_node_in_group("local_player")
+	if v == null or v.get("character_id") == null:
+		return 1.0
+	return voice_pitch_for(str(v.get("character_id")))
 
 func _process(_delta: float) -> void:
 	if get_tree() == null:
@@ -68,7 +98,7 @@ func _process(_delta: float) -> void:
 		var top := 22.0
 		if v.get("stats") != null:
 			top = float((v.get("stats") as KartStats).top_speed)
-		_engine.pitch_scale = 0.7 + clampf(lv.length() / maxf(top, 1.0), 0.0, 1.2)
+		_engine.pitch_scale = clampf((0.7 + clampf(lv.length() / maxf(top, 1.0), 0.0, 1.2)) * _local_voice_pitch(), 0.5, 2.0)
 	elif _engine.playing:
 		_engine.stop()
 	var want_skid := -60.0
@@ -81,11 +111,24 @@ func _input(event: InputEvent) -> void:
 		toggle_music()
 
 func toggle_music() -> void:
-	music_on = not music_on
+	GameManager.set_music_enabled(not GameManager.settings_music)
+
+func set_music_enabled(on: bool) -> void:
+	music_on = on
+	if _music == null:
+		return
 	if music_on:
 		_music.play()
 	else:
 		_music.stop()
+
+func set_master_volume(v: float) -> void:
+	var bus := AudioServer.get_bus_index("Master")
+	if v <= 0.001:
+		AudioServer.set_bus_mute(bus, true)
+	else:
+		AudioServer.set_bus_mute(bus, false)
+		AudioServer.set_bus_volume_db(bus, linear_to_db(clampf(v, 0.001, 1.0)))
 
 # --- Synthese ---
 

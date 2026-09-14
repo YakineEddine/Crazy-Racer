@@ -6,7 +6,7 @@ Reference set for an AI coding agent (OpenCode) building this game in **Godot 4.
 
 1. **`00_PROJECT_STRUCTURE.md`** — folder tree, naming conventions, autoload order. Set this up before writing any gameplay code.
 2. **`01_CORE_SYSTEMS_LOGIC.md`** — GameManager, LobbyManager, TeamManager, MatchmakingService, BoundaryManager, ChaosEventSystem, base vehicle controller, RPC/authority conventions. Build offline-testable first (single-player against the phase machine) before wiring networking.
-3. **`02_VEHICLES_AND_ITEMS.md`** — the 5 vehicle classes, `KartStats` schema, item roster, item pickup/use pipeline.
+3. **`02_VEHICLES_AND_ITEMS.md`** — the 8 vehicle classes, `KartStats` schema, item roster, item pickup/use pipeline.
 4. **`03_MAPS_AND_CHAOS_EVENTS.md`** — `MapData` schema, per-map scene contract, all 4 launch maps, chaos event catalogue.
 5. **`04_UI_UX_SPEC.md`** — every screen (menu, lobby, countdown, race HUD, results), layout and interaction rules.
 6. **`05_ANIMATIONS_SPEC.md`** — vehicle and character animation clips, triggers, the Penguin-transform special case.
@@ -26,5 +26,5 @@ Reference set for an AI coding agent (OpenCode) building this game in **Godot 4.
 - Bot-fill for under-filled private rooms: yes/no.
 - Exact drift→boost curve values per vehicle class.
 - Final team-scoring formula for Duo/Squad (current default: sum of finishing positions — tunable).
-- Final numeric balance pass across all 5 vehicle classes.
+- Final numeric balance pass across all 8 vehicle classes.
 - Portrait vs. landscape as the primary mobile orientation.

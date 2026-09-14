@@ -68,6 +68,22 @@ func _ready() -> void:
 	for c in get_children():
 		if c is VehicleWheel3D:
 			_wheels.append(c)
+	# Suspension / grip par vehicule (KartStats). Avant : 50.0 / 4.0 / 4.0 identiques
+	# (et friction reelle 10.5 defaut moteur, le `friction_slip = 2.5` des .tscn etant ignore en 4.7).
+	for w in _wheels:
+		var wheel := w as VehicleWheel3D
+		wheel.suspension_stiffness = stats.suspension_stiffness
+		wheel.damping_compression = stats.damping_compression
+		wheel.damping_relaxation = stats.damping_relaxation
+		wheel.wheel_friction_slip = stats.wheel_friction_slip
+	# Hitbox par vehicule (KartStats.collision_shape_scale, avant jamais lu).
+	# Valeurs .tres utilisees comme tailles absolues (multiplier casserait la grille
+	# de spawn 4.0 : ex. truck scene 3.8 x 2.3 = 8.74). Duplique pour ne pas muter
+	# la sous-ressource partagee entre instances d'une meme scene.
+	var col_node := get_node_or_null("CollisionShape3D") as CollisionShape3D
+	if col_node and col_node.shape is BoxShape3D:
+		col_node.shape = (col_node.shape as BoxShape3D).duplicate()
+		(col_node.shape as BoxShape3D).size = stats.collision_shape_scale
 	_body_mat = StandardMaterial3D.new()
 	_body_mat.albedo_color = stats.body_color
 	_body_mat.roughness = 0.5
@@ -146,7 +162,7 @@ func reset_effects() -> void:
 func _physics_process(delta: float) -> void:
 	_tick_timers(delta)
 	if controls_locked or GameManager.current_phase != GameManager.MatchPhase.RACING:
-		_pre_go = Input.is_action_pressed("ui_up") or touch_drift
+		_pre_go = Input.is_action_pressed("throttle") or touch_drift
 		_set_engine(0.0)
 		if absf(linear_velocity.length()) > 0.5:
 			_set_brake(2.0)
@@ -162,16 +178,19 @@ func _physics_process(delta: float) -> void:
 		throttle = float(ai[1])
 		drift = bool(ai[2])
 	else:
-		steer = Input.get_axis("ui_right", "ui_left")
+		# Ordre d'axes inchange (gauche = +1) : preserve l'inversion aval (-steer).
+		steer = Input.get_axis("steer_right", "steer_left")
 		if absf(touch_steer) > 0.05 or touch_drift:
-			steer = touch_steer
+			# Joystick : +X = droite (value = d.x/radius), inverse du clavier (gauche = +1).
+			# On aligne ici pour que droite = -1 comme au clavier, avant l'inversion aval (-steer).
+			steer = -touch_steer
 			_keys_seen = false
-		if Input.is_action_pressed("ui_left") or Input.is_action_pressed("ui_right") or Input.is_action_pressed("ui_up") or Input.is_action_pressed("ui_down"):
+		if Input.is_action_pressed("steer_left") or Input.is_action_pressed("steer_right") or Input.is_action_pressed("throttle") or Input.is_action_pressed("brake"):
 			_keys_seen = true
 		var auto_on := auto_accelerate and not _keys_seen
-		if Input.is_action_pressed("ui_up"):
+		if Input.is_action_pressed("throttle"):
 			throttle = 1.0
-		elif Input.is_action_pressed("ui_down"):
+		elif Input.is_action_pressed("brake"):
 			throttle = -0.6
 		elif auto_on:
 			throttle = touch_throttle
@@ -192,8 +211,13 @@ func _physics_process(delta: float) -> void:
 	if slip_timer > 0.0:
 		steer = clampf(steer * 1.8 + sin(Time.get_ticks_msec() / 120.0) * 0.5, -1.0, 1.0)
 	# Direction via les roues motrices.
+	# Convention Godot testee en jeu (4.7) : forward physique = +Z (MODEL_FRONT) :
+	# engine_force positive => +Z, steering positif => +X (gauche physique +Z).
+	# Projet visuel/piste/camera = -Z (mesh avant -Z, CamRig en +Z derriere, spawns yaw 90°).
+	# On inverse donc ici pour que haut = -Z (devant visuel) et gauche = -X (gauche visuel).
+	# Commun clavier/gamepad/touch/bots (memes vars steer/throttle). Flip reverse-item (ligne 183) preserve en amont.
 	var max_steer := 0.55 * stats.turning_radius * handling
-	_set_steering(lerpf(_get_steering(), steer * max_steer, 12.0 * delta))
+	_set_steering(lerpf(_get_steering(), -steer * max_steer, 12.0 * delta))
 	# Vitesse max : pieces (+1.5%/piece), offroad, etoile, caoutchouc IA.
 	var speed := linear_velocity.length()
 	var off := _offroad_factor(delta)
@@ -211,7 +235,8 @@ func _physics_process(delta: float) -> void:
 	if speed > max_speed + 8.0 and _is_server():
 		linear_velocity = linear_velocity.normalized() * (max_speed + 8.0)
 	if speed < max_speed:
-		_set_engine(target_force)
+		# Inverse : throttle +1 (haut) => force negative => -Z (devant visuel). Boost inclus dans target_force.
+		_set_engine(-target_force)
 	else:
 		_set_engine(0.0)
 	_set_brake(0.0)
@@ -220,6 +245,9 @@ func _physics_process(delta: float) -> void:
 	# Drift a paliers : bleu (mini) -> orange (super) -> violet (ultra).
 	var drifting := drift and absf(steer) > 0.25 and speed > 8.0
 	drift_active = drifting
+	# NOTE : _was_drift doit etre lu AVANT _apply_lean() qui l'ecrase chaque frame,
+	# sinon le bloc de release ci-dessous ne peut jamais s'executer (il vise le tour precedent).
+	var _was_drift_prev := _was_drift
 	if drifting:
 		boost_charge = minf(1.0, boost_charge + delta * 0.45)
 		_spark_t -= delta
@@ -237,19 +265,22 @@ func _physics_process(delta: float) -> void:
 			_spawn_skid("DriftTrailAnchorR")
 	else:
 		_apply_lean(steer, false)
-	if not drift and _was_drift:
+	if not drift and _was_drift_prev:
+		# Courbe de drift par vehicule (avant jamais lue) : module les durees de palier
+		# 0.6/1.2/1.9s (seuils 0.35/0.7/0.99 et charge +0.45/s inchanges). Echelle douce
+		# 0.85..1.15 : ex. velo (courbe haute tot) = meilleurs mini-boosts, truck (basse tot) = faibles.
 		if boost_charge >= 0.99:
-			boosting_time = 1.9
+			boosting_time = 1.9 * _drift_boost_mult(boost_charge)
 			_squash_stretch()
 			Audio.play("boost")
 			VfxFactory.burst(self, "boost")
 		elif boost_charge >= 0.7:
-			boosting_time = 1.2
+			boosting_time = 1.2 * _drift_boost_mult(boost_charge)
 			_squash_stretch()
 			Audio.play("boost")
 			VfxFactory.burst(self, "boost")
 		elif boost_charge >= 0.35:
-			boosting_time = 0.6
+			boosting_time = 0.6 * _drift_boost_mult(boost_charge)
 			Audio.play("boost")
 			VfxFactory.burst(self, "boost")
 		boost_charge = 0.0
@@ -285,6 +316,12 @@ func _squash_stretch() -> void:
 	var tw := create_tween()
 	tw.tween_property(body, "scale", Vector3(1.15, 0.8, 1.15), 0.09)
 	tw.tween_property(body, "scale", Vector3.ONE, 0.18)
+
+func _drift_boost_mult(charge: float) -> float:
+	if stats == null or stats.drift_boost_curve == null:
+		return 1.0
+	var g := clampf(stats.drift_boost_curve.sample(clampf(charge, 0.0, 1.0)), 0.0, 1.0)
+	return 0.85 + 0.30 * g
 
 func _spawn_skid(anchor_name: String) -> void:
 	var anchor := get_node_or_null(anchor_name) as Marker3D

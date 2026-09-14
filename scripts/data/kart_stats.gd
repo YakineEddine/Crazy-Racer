@@ -15,3 +15,10 @@ extends Resource
 @export var ignores_size_hazards: bool = false ## true pour Bicycle
 @export var body_color: Color = Color(0.2, 0.7, 1.0)
 @export var boost_power: float = 12.0
+## Suspension / grip par vehicule (appliques aux VehicleWheel3D dans vehicle_controller._ready).
+## Baseline = valeurs mesurees en jeu avant differentiation (stiffness/damping des .tscn,
+## friction = defaut moteur 10.5 car le `friction_slip = 2.5` des .tscn est ignore en 4.7).
+@export var suspension_stiffness: float = 50.0
+@export var damping_compression: float = 4.0
+@export var damping_relaxation: float = 4.0
+@export var wheel_friction_slip: float = 10.5

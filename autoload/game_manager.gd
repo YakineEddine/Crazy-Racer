@@ -2,7 +2,7 @@ extends Node
 ## GameManager — machine a etats + modes Course / Grand Prix / Contre-la-montre (01 §1).
 ## Seul ce singleton mute current_phase. Transitions autoritaires serveur -> RPC.
 
-enum MatchPhase { MENU, LOBBY, COUNTDOWN, RACING, RESULTS }
+enum MatchPhase { MENU, LOBBY, COUNTDOWN, RACING, RESULTS, PAUSED }
 
 signal phase_changed(new_phase: int)
 signal race_started()
@@ -22,6 +22,11 @@ var gp_points: Dictionary = {} ## { nom: pts }
 var gp_final: bool = false
 var tt_last: Dictionary = {} ## { total, best, is_record, map }
 
+## Reglages persistants (section "settings" du meme cfg, defauts = comportement actuel).
+var settings_music: bool = true
+var settings_volume: float = 1.0 ## 0.0..1.0, bus Master
+var settings_quality: String = "high" ## "high" ou "low" (VfxFactory)
+
 const GP_TABLE := [15, 12, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
 const SAVE_PATH := "user://crazy_racer.cfg"
 
@@ -31,12 +36,20 @@ var _current_ui: Control = null
 var _current_map: Node3D = null
 var _countdown_time: float = 0.0
 
+## Poursuite camera (lissage) : meme fov/offset de repos qu'avant, suivi adouci.
+const CAM_OFFSET := Vector3(0, 3.2, 6.5)
+const CAM_PITCH_DEG := -14.0
+const CAM_POS_SMOOTH := 6.0
+const CAM_YAW_SMOOTH := 5.0
+var _chase_rigs: Array = [] ## [{rig: Node3D, vehicle: Node3D}]
+
 const UI_SCENES := {
 	0: "res://scenes/ui/main_menu.tscn",
 	1: "res://scenes/ui/lobby_screen.tscn",
 	2: "res://scenes/ui/countdown_overlay.tscn",
 	3: "res://scenes/ui/race_hud.tscn",
 	4: "res://scenes/ui/results_screen.tscn",
+	5: "res://scenes/ui/pause_menu.tscn",
 }
 
 const MAP_SCENES := {
@@ -50,6 +63,7 @@ const MAP_SHORT := {"map1_neon": "Neon", "map2_swamp": "Swamp", "map3_ice": "Gla
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	load_settings()
 
 static func fmt_time(t: float) -> String:
 	return "%d:%05.2f" % [int(t) / 60, fmod(maxf(t, 0.0), 60.0)]
@@ -154,6 +168,7 @@ func start_tt(map_id: String) -> void:
 func start_countdown() -> void:
 	if _is_networked() and not multiplayer.is_server():
 		return
+	get_tree().paused = false
 	_load_map()
 	_spawn_racers()
 	change_phase(MatchPhase.COUNTDOWN)
@@ -176,6 +191,7 @@ func _process(delta: float) -> void:
 		_countdown_time -= delta
 		if _countdown_time <= 0.0:
 			_begin_race()
+	_update_chase_cams(delta)
 
 func _begin_race() -> void:
 	change_phase(MatchPhase.RACING)
@@ -188,6 +204,32 @@ func _begin_race() -> void:
 
 func _lock_controls(locked: bool) -> void:
 	get_tree().call_group("vehicles", "set_controls_locked", locked)
+
+## --- Pause (RACING <-> PAUSED, locale uniquement, pas de RPC) ---
+
+func pause_race() -> void:
+	if current_phase != MatchPhase.RACING:
+		return
+	if _is_networked() and not multiplayer.is_server():
+		return
+	_lock_controls(true)
+	change_phase(MatchPhase.PAUSED)
+	get_tree().paused = true
+
+func resume_race() -> void:
+	if current_phase != MatchPhase.PAUSED:
+		return
+	get_tree().paused = false
+	change_phase(MatchPhase.RACING)
+	# _pre_go est faux ici (pose pendant RACING debloque, jamais pendant PAUSED
+	# car la physique est gelee) : pas de turbo surprise a la reprise.
+	_lock_controls(false)
+
+func toggle_pause() -> void:
+	if current_phase == MatchPhase.RACING:
+		pause_race()
+	elif current_phase == MatchPhase.PAUSED:
+		resume_race()
 
 func get_display_name(pid: int) -> String:
 	var info: Dictionary = LobbyManager.players.get(pid, {})
@@ -272,6 +314,44 @@ func add_gp_win() -> void:
 func dict(v: Variant) -> Dictionary:
 	return v if v is Dictionary else {}
 
+## --- Reglages persistants (meme fichier, section "settings") ---
+
+func load_settings() -> void:
+	var cfg := _load_cfg()
+	settings_music = bool(cfg.get_value("settings", "music", true))
+	settings_volume = clampf(float(cfg.get_value("settings", "volume", 1.0)), 0.0, 1.0)
+	var q := str(cfg.get_value("settings", "quality", "high"))
+	settings_quality = q if (q == "low" or q == "high") else "high"
+
+func save_settings() -> void:
+	var cfg := _load_cfg()
+	cfg.set_value("settings", "music", settings_music)
+	cfg.set_value("settings", "volume", settings_volume)
+	cfg.set_value("settings", "quality", settings_quality)
+	cfg.save(SAVE_PATH)
+
+func apply_settings() -> void:
+	# Pousse vers Audio (bus + musique) et VfxFactory. Appele par Audio._ready
+	# (Audio demarre apres GameManager, reglages deja charges) et par chaque setter.
+	VfxFactory.particle_quality = VfxFactory.Quality.LOW if settings_quality == "low" else VfxFactory.Quality.HIGH
+	Audio.set_master_volume(settings_volume)
+	Audio.set_music_enabled(settings_music)
+
+func set_music_enabled(on: bool) -> void:
+	settings_music = on
+	apply_settings()
+	save_settings()
+
+func set_volume(v: float) -> void:
+	settings_volume = clampf(v, 0.0, 1.0)
+	apply_settings()
+	save_settings()
+
+func set_quality(q: String) -> void:
+	settings_quality = "low" if q == "low" else "high"
+	apply_settings()
+	save_settings()
+
 func _load_cfg() -> ConfigFile:
 	var cfg := ConfigFile.new()
 	cfg.load(SAVE_PATH)
@@ -299,6 +379,7 @@ func back_to_menu() -> void:
 	change_phase(MatchPhase.MENU)
 
 func _cleanup_race() -> void:
+	get_tree().paused = false
 	race_timer = 0.0
 	results = []
 	tt_last = {}
@@ -379,6 +460,38 @@ func _attach_chase_camera(v: Node) -> void:
 	var rig := Node3D.new()
 	rig.name = "CamRig"
 	v.add_child(rig)
-	rig.position = Vector3(0, 3.2, 6.5)
-	rig.rotation_degrees = Vector3(-14, 0, 0)
+	rig.position = CAM_OFFSET
+	rig.rotation_degrees = Vector3(CAM_PITCH_DEG, 0, 0)
 	rig.add_child(cam)
+	# Lissage : le rig ne suit plus le vehicule de facon rigide (collisions, drift,
+	# wobble, shrink scalaient/secouaient la vue). En top_level, on le ramene chaque
+	# frame vers la position de repos (memes fov/offset), sans changer le setup.
+	rig.top_level = true
+	_chase_rigs.append({"rig": rig, "vehicle": v})
+
+func _update_chase_cams(delta: float) -> void:
+	if _chase_rigs.is_empty():
+		return
+	# Integration independante du framerate : t = 1 - exp(-vitesse * delta).
+	var tp := 1.0 - exp(-CAM_POS_SMOOTH * delta)
+	var ty := 1.0 - exp(-CAM_YAW_SMOOTH * delta)
+	var pitch := deg_to_rad(CAM_PITCH_DEG)
+	var kept: Array = []
+	for e in _chase_rigs:
+		# Validite AVANT le cast : `as` sur un objet libere (quit vers menu) = erreur.
+		var rig_obj: Variant = e.get("rig")
+		var veh_obj: Variant = e.get("vehicle")
+		if not is_instance_valid(rig_obj) or not is_instance_valid(veh_obj):
+			continue
+		var rig := rig_obj as Node3D
+		var veh := veh_obj as Node3D
+		# Cible = offset de repos dans le repere du vehicule (derriere +Z, dessus).
+		var target_pos: Vector3 = (veh.global_transform * Transform3D(Basis(), CAM_OFFSET)).origin
+		rig.global_position = rig.global_position.lerp(target_pos, clampf(tp, 0.0, 1.0))
+		# Suivi du lacet (yaw) uniquement : tangage fixe, roulis a zero.
+		# Isole la camera des tonneaux/wobbles, garde le derriere-vue en virage.
+		var yaw: float = veh.global_rotation.y
+		var cur: Vector3 = rig.global_rotation
+		rig.global_rotation = Vector3(pitch, lerp_angle(cur.y, yaw, clampf(ty, 0.0, 1.0)), 0.0)
+		kept.append(e)
+	_chase_rigs = kept

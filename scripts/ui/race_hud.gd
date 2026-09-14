@@ -139,6 +139,15 @@ func _build() -> void:
 			p.call("use_item")
 	)
 	add_child(_item_btn)
+	# Bouton pause haut-centre (tactile) : Echap / Start font pareil via l'action "pause".
+	var pause_btn := Button.new()
+	pause_btn.text = "❚❚"
+	pause_btn.custom_minimum_size = Vector2(120, 44)
+	pause_btn.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	pause_btn.position = Vector2(-60, 84)
+	pause_btn.add_theme_font_size_override("font_size", 20)
+	pause_btn.pressed.connect(func() -> void: GameManager.toggle_pause())
+	add_child(pause_btn)
 	# Flash hit + gravity overlay.
 	_flash = ColorRect.new()
 	_flash.color = Color(1, 0, 0, 0)
@@ -161,6 +170,11 @@ func _set_drift(on: bool) -> void:
 	var p := get_tree().get_first_node_in_group("local_player")
 	if p:
 		p.set("touch_drift", on)
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("pause"):
+		GameManager.toggle_pause()
+		get_viewport().set_input_as_handled()
 
 func _on_auto_toggle() -> void:
 	var p := get_tree().get_first_node_in_group("local_player")

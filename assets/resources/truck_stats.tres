@@ -20,3 +20,7 @@ knockback_multiplier = 0.4
 ignores_size_hazards = false
 body_color = Color(1, 0.55, 0.1, 1)
 boost_power = 11.0
+suspension_stiffness = 70.0
+damping_compression = 5.8
+damping_relaxation = 5.8
+wheel_friction_slip = 13.0

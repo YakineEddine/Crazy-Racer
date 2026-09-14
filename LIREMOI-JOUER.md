@@ -19,9 +19,10 @@ Aucun asset externe requis.
 
 ## 3. Controles
 
-- Clavier : `↑` accelerer (manuel : sans appui le kart s'arrete), `↓` freiner, `←/→` diriger,
-  `Espace` drift, `E` objet. Maintenir `↑` pendant le decompte = **depart turbo**.
+- Clavier : `↑`/`W` accelerer (manuel : sans appui le kart s'arrete), `↓`/`S` freiner, `←`/`A` `→`/`D` diriger,
+  `Espace` drift, `E` objet, `Echap` pause. Maintenir `↑` pendant le decompte = **depart turbo**.
 - Tactile : joystick + `DRIFT` + gros bouton objet, toggle `AUTO` (auto-acceleration une-main).
+- Pause (`Echap` ou bouton ❚❚) : reprendre, **reglages** (musique, volume, qualite graphique — sauvegardes), quitter.
 - Le jeu bascule auto/manuel selon le dernier peripherique touche.
 
 ## 4. Systeme de course (façon Mario Kart)
@@ -75,5 +76,5 @@ whoosh de boost, bips 3-2-1-GO, impacts — tout est synthetise en WAV au demarr
 
 `scenes/main.tscn` • `autoload/*` (6 + `Audio`) • `scripts/vehicles/vehicle_controller.gd` •
 `scripts/items/item_system.gd|projectile.gd|coin.gd|item_box.gd` • `scripts/maps/map_builder.gd` •
-`scripts/audio/audio_manager.gd` • `scenes/vehicles/*.tscn` (5) • `scenes/maps/*.tscn` (4) •
-`scenes/ui/*.tscn` (5) • `assets/resources/*.tres` (21) • `shaders/gravity_flip.gdshader`
+`scripts/audio/audio_manager.gd` • `scenes/vehicles/*.tscn` (8) • `scenes/maps/*.tscn` (4) •
+`scenes/ui/*.tscn` (6) • `assets/resources/*.tres` (32) • `shaders/gravity_flip.gdshader`

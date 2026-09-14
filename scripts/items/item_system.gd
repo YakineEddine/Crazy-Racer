@@ -164,11 +164,8 @@ func _apply_to(target: Node, item_id: String, data: ItemData) -> void:
 			target.call("apply_star", 6.0)
 		"rocket":
 			target.call("apply_rocket", 7.0)
-		_:
-			if data.effect_script_path != "" and ResourceLoader.exists(data.effect_script_path):
-				var s: Script = load(data.effect_script_path) as Script
-				if s:
-					s.call("apply", target, data)
+		_: ## inatteignable : les 14 ids sont couverts ci-dessus
+			pass
 
 func _fire_shell(user: Node, target: Node, homing: bool) -> void:
 	var sh := ShellProjectile.new()
